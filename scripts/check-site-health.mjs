@@ -15,9 +15,9 @@ const ROUTES = [
   '/calculators/', '/clinical-assistant/', '/ddx/', '/documents/', '/drugref/',
   '/empiric/', '/labs/', '/lookup/', '/naloxone/', '/opioids/', '/pals/',
   '/peds/', '/readiness/', '/reportable/', '/screener/', '/sepsis/', '/steroids/',
-  '/review/', '/sti-guide/', '/tccc/', '/toxicology/', '/triage/', '/updates/', '/vaccines/', '/wound/',
+  '/review/', '/usaf-assistant/', '/sti-guide/', '/tccc/', '/toxicology/', '/triage/', '/updates/', '/vaccines/', '/wound/',
 ];
-const PRIVATE_ROUTES = ['/clinical-assistant/', '/review/'];
+const PRIVATE_ROUTES = ['/clinical-assistant/', '/review/', '/usaf-assistant/'];
 
 const REMOVED_V2 = [
   'abx2', 'als2', 'anticoag2', 'calculators2', 'ddx2', 'empiric2', 'labs2',
