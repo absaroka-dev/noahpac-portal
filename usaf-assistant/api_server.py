@@ -103,7 +103,17 @@ def pages_text(meta):
     return f"p. {a}" if a == b else f"pp. {a}-{b}"
 
 
+def currency_of(filename):
+    """Status of one publication from the daily currency check (None when unknown)."""
+    try:
+        return json.loads((STATE_DIR / "currency.json").read_text()).get("documents", {}).get(filename, {}).get("status")
+    except (OSError, ValueError):
+        return None
+
+
 def stale_warning(meta):
+    if currency_of(meta.get("source_filename")) == "current":
+        return None  # compared with the official file within the last day: the age of the date says nothing
     d = meta.get("pub_date")
     try:
         age = (datetime.date.today() - datetime.date.fromisoformat(d)).days
