@@ -123,6 +123,14 @@ class ApiFlowTest(unittest.TestCase):
         self.assertFalse(doc["older_than_limit"])
         self.assertEqual(d["currency_checked"], "2026-11-09T06:40:00")
 
+    def test_age_warning_in_answers_is_skipped_for_publications_confirmed_current(self):
+        base = Path(self.tmp.name)
+        meta = {"source_filename": "OLD2.pdf", "doc": "OLD2", "pub_date": "2019-01-01"}
+        (base / "currency.json").write_text(json.dumps({"documents": {"OLD2.pdf": {"status": "verify_due"}}}))
+        self.assertIn("check e-Publishing", self.api.stale_warning(meta))
+        (base / "currency.json").write_text(json.dumps({"documents": {"OLD2.pdf": {"status": "current"}}}))
+        self.assertIsNone(self.api.stale_warning(meta))
+
     def test_unknown_mode(self):
         self.assertEqual(self.post(self.ok_body(mode="shell")).status_code, 400)
 
