@@ -112,6 +112,17 @@ class ApiFlowTest(unittest.TestCase):
         self.assertEqual(d["documents"][0]["short"], "MSD")
         self.assertTrue(d["documents"][0]["older_than_limit"])
 
+    def test_library_shows_the_currency_check_and_drops_the_age_warning_when_current(self):
+        base = Path(self.tmp.name)
+        (base / "ingest_report.json").write_text(json.dumps({"built": "2026-11-08T20:55:02", "documents": [
+            {"file": "OLD.pdf", "short": "OLD", "pub_date": "2020-01-01", "date_basis": "manifest", "chunks": 3, "category": "standards"}]}))
+        (base / "currency.json").write_text(json.dumps({"checked": "2026-11-09T06:40:00", "documents": {"OLD.pdf": {"status": "current", "message": "Same file as the one on e-Publishing."}}}))
+        d = self.client.get("/api/library", headers={"X-Remote-User": "u"}).get_json()
+        doc = d["documents"][0]
+        self.assertEqual(doc["currency"]["status"], "current")
+        self.assertFalse(doc["older_than_limit"])
+        self.assertEqual(d["currency_checked"], "2026-11-09T06:40:00")
+
     def test_unknown_mode(self):
         self.assertEqual(self.post(self.ok_body(mode="shell")).status_code, 400)
 

@@ -9,6 +9,7 @@ APP = REPO / "usaf-assistant"
 sys.path.insert(0, str(APP))
 
 import modes  # noqa: E402
+import check_library_currency as cur  # noqa: E402
 import msd_tables  # noqa: E402
 import refcheck  # noqa: E402
 import retrieval  # noqa: E402
@@ -147,6 +148,40 @@ class MsdTableTest(unittest.TestCase):
         self.assertEqual(msd_tables.join_lines([w("b", 20.0, 5), w("a2", 10.2, 30), w("a1", 10.0, 5)]), "a1 a2 b")
 
 
+class CurrencyTest(unittest.TestCase):
+    TODAY = __import__("datetime").date(2026, 11, 8)
+    MAN = {"a.pdf": {"short": "A", "check_url": "https://x/a.pdf"},
+           "b.pdf": {"short": "B", "last_verified": "2026-10-20", "verify_every_days": 30},
+           "c.pdf": {"short": "C"},
+           "d.pdf": {"short": "D", "last_verified": "2026-01-01", "verify_every_days": 90}}
+
+    def test_url_entry_same_hash_is_current_and_different_hash_is_update_available(self):
+        fp = {"https://x/a.pdf": {"status": 200, "sha256": "aa", "last_modified": "Mon"}}
+        self.assertEqual(cur.evaluate(self.MAN, fp, {"a.pdf": "aa"}, self.TODAY)["a.pdf"]["status"], "current")
+        self.assertEqual(cur.evaluate(self.MAN, fp, {"a.pdf": "bb"}, self.TODAY)["a.pdf"]["status"], "update_available")
+
+    def test_unreachable_counts_failures_and_keeps_the_last_known_answer(self):
+        prev = {"a.pdf": {"status": "current", "message": "ok", "failures": 0}}
+        r = cur.evaluate(self.MAN, {"https://x/a.pdf": {"status": 403}}, {"a.pdf": "aa"}, self.TODAY, prev)["a.pdf"]
+        self.assertEqual((r["status"], r["failures"], r["last_known"]["status"]), ("unreachable", 1, "current"))
+        r2 = cur.evaluate(self.MAN, {}, {"a.pdf": "aa"}, self.TODAY, {"a.pdf": r})["a.pdf"]
+        self.assertEqual(r2["failures"], 2)
+
+    def test_date_based_entries(self):
+        out = cur.evaluate(self.MAN, {}, {}, self.TODAY)
+        self.assertEqual(out["b.pdf"]["status"], "verified")      # 2026-10-20 + 30 days = 2026-11-19
+        self.assertEqual(out["b.pdf"]["due"], "2026-11-19")
+        self.assertEqual(out["c.pdf"]["status"], "verify_due")    # never verified
+        self.assertEqual(out["d.pdf"]["status"], "verify_due")    # 2026-01-01 + 90 days has passed
+
+    def test_metrics(self):
+        docs = cur.evaluate(self.MAN, {"https://x/a.pdf": {"status": 200, "sha256": "zz"}}, {"a.pdf": "aa"}, self.TODAY)
+        t = cur.metrics_text(docs, 1000)
+        self.assertIn("usaf_library_update_available 1", t)
+        self.assertIn("usaf_library_verify_due 2", t)
+        self.assertIn('usaf_library_doc_status{doc="A",status="update_available"} 1', t)
+
+
 class ModesAndSourceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -178,6 +213,13 @@ class ModesAndSourceTest(unittest.TestCase):
     def test_port_does_not_collide_with_other_local_services(self):
         self.assertNotIn("8766", self.api)
         self.assertNotIn("8767", self.api)
+
+    def test_currency_monitor_is_wired_up(self):
+        unit = (REPO / "ops" / "systemd" / "usaf-assistant-currency.service").read_text()
+        self.assertIn("ExecStart=/var/www/noahpac-portal/ops/usaf-assistant-currency.sh", unit)
+        timer = (REPO / "ops" / "systemd" / "usaf-assistant-currency.timer").read_text()
+        self.assertIn("OnCalendar=", timer)  # wall-clock, not boot-relative
+        self.assertNotIn("OnBootSec", timer)
 
     def test_systemd_sandbox(self):
         for d in ("User=www-data", "NoNewPrivileges=true", "ProtectSystem=strict", "ProtectHome=true", "CapabilityBoundingSet=",

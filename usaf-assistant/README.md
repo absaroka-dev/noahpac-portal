@@ -22,6 +22,13 @@ help answered only from publications loaded in the library. Input must be de-ide
 
 The page shows the list of loaded publications with their versions (`/api/library`, built from `ingest_report.json` plus `manifest.json`; the `version` and `note` fields in the manifest are what the user sees). Text documents (`.txt`) can be loaded like PDFs; `modes/narsum_template.txt` is the NARSUM layout used by the NARSUM mode.
 
+## Are the publications still current? (`check_library_currency.py`)
+`usaf-assistant-currency.timer` (daily, about 06:40) runs `ops/usaf-assistant-currency.sh`. Two kinds of check, set per publication in `manifest.json`:
+- **`check_url`** (public e-Publishing PDF): the file is fetched in a real headless browser (`fetch-epub.mjs`; e-Publishing's bot protection answers scripts with 403) and compared byte for byte with the loaded copy. Same = `current`; different = `update_available`.
+- **No URL** (Medical Standards Directory, classification directories: CAC only): `last_verified` + `verify_every_days`. When the date passes the page shows `verify_due`. After confirming on the official site that the loaded edition is the newest: `sudo ops/usaf-assistant-currency.sh --mark-verified DAFECD DAFOCD MSD` (short names or file names).
+Results: `currency.json` in the state directory (shown on the page), textfile metrics `usaf_library_*` and four Grafana alerts (`usaf-library-currency.yaml` in the monitoring stack). A publication that is `current` no longer shows the generic "older than 540 days" warning. Needs Chromium from Playwright (`PLAYWRIGHT_CHROMIUM` overrides the search) and `tests/node_modules/@playwright/test`.
+Loaded from e-Publishing on 2026-11-08 and monitored: DAFI 31-117, DoDM 5210.42/DAFMAN 13-501 (GM), DAFMAN 48-123, DAFI 36-2910 (GM). Not on e-Publishing (CAC): MSD, DAFECD, DAFOCD, NARSUM template.
+
 ## Adding a person
 Add `usaf-assistant` to the user's `groups` in `/opt/stacks/authelia/config/users_database.yml`, restart the `authelia` container.
 
