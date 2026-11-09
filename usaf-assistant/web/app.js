@@ -89,15 +89,32 @@
     add("msg-user", q);
     var typing = add("typing", "Searching the publications…");
     try {
-      var resp = await fetch("/usaf-assistant/api/ask", {
+      var start = await fetch("/usaf-assistant/api/ask", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: mode, question: q, conversation_history: history, identifiers_removed: true })
       });
-      typing.remove();
-      var ct = resp.headers.get("content-type") || "";
-      if (!ct.includes("application/json")) { add("msg-error", "Your session has probably expired. Reload this page and sign in again."); return; }
-      var data = await resp.json();
-      if (!resp.ok || data.error) { add("msg-error", data.error || "Request failed (" + resp.status + ")."); return; }
+      var sct = start.headers.get("content-type") || "";
+      if (!sct.includes("application/json")) { typing.remove(); add("msg-error", "Your session has probably expired. Reload this page and sign in again."); return; }
+      var started = await start.json();
+      if (!start.ok || !started.job) { typing.remove(); add("msg-error", started.error || "Request failed (" + start.status + ")."); return; }
+      // Answers take 10-40 s, longer than the 5 s the Cloudflare edge allows for one request, so poll for the result.
+      var data = null, fails = 0, t0 = Date.now();
+      while (Date.now() - t0 < 300000) {
+        await new Promise(function (r) { setTimeout(r, 2000); });
+        var poll;
+        try { poll = await fetch("/usaf-assistant/api/result/" + encodeURIComponent(started.job), { cache: "no-store" }); fails = 0; }
+        catch (e) { if (++fails > 5) throw e; continue; }
+        var pct = poll.headers.get("content-type") || "";
+        if (!pct.includes("application/json")) { typing.remove(); add("msg-error", "Your session has probably expired. Reload this page and sign in again."); return; }
+        var pj = await poll.json();
+        if (poll.status === 404) { typing.remove(); add("msg-error", pj.error || "The request expired. Send it again."); return; }
+        if (pj.pending) { typing.textContent = "Searching the publications and writing… " + Math.round((Date.now() - t0) / 1000) + " s"; continue; }
+        typing.remove();
+        data = pj.result;
+        if (pj.http_status !== 200 || data.error) { add("msg-error", data.error || "Request failed (" + pj.http_status + ")."); return; }
+        break;
+      }
+      if (!data) { typing.remove(); add("msg-error", "No answer after 5 minutes. Try a shorter question."); return; }
       addAnswer(data);
       history.push({ role: "user", content: q }); history.push({ role: "assistant", content: data.answer });
       history = history.slice(-8); newConv.hidden = false;

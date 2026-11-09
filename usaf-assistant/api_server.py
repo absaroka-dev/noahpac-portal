@@ -14,6 +14,8 @@ import datetime
 import json
 import os
 import re
+import secrets
+import threading
 import time
 from pathlib import Path
 
@@ -113,22 +115,68 @@ def stale_warning(meta):
 
 
 def reply(payload, status=200):
-    return jsonify(payload), status
+    return payload, status
 
 
 def error(msg, status):
-    return jsonify({"error": msg}), status
+    return {"error": msg}, status
+
+
+# Cloudflare cuts any request whose first byte takes more than about 5 s (seen on both of this host's zones), and an answer takes
+# 10-40 s. So POST /api/ask only starts a job and returns at once; the page polls GET /api/result/<id>.
+JOBS = {}
+JOBS_LOCK = threading.Lock()
+JOB_TTL = 1800
+MAX_JOBS_PER_USER = 2
+SLOTS = threading.BoundedSemaphore(int(os.environ.get("USAF_MAX_PARALLEL", "4")))
+
+
+def _run_job(job_id, user, data):
+    try:
+        with SLOTS:
+            payload, status = ask_impl(user, data)
+    except Exception as e:  # never leave a job pending forever
+        app.logger.exception("job failed")
+        payload, status = {"error": f"Unexpected server error ({type(e).__name__}). Try again."}, 500
+    with JOBS_LOCK:
+        JOBS[job_id].update(done=True, status=status, payload=payload)
 
 
 @app.route("/api/ask", methods=["POST"])
 def ask():
     user = (request.headers.get("X-Remote-User") or "").strip()
     if not USER_RE.match(user):
-        return error("Sign in required.", 401)
+        return jsonify({"error": "Sign in required."}), 401
+    data = request.get_json(force=True, silent=True) or {}
+    now = time.time()
+    with JOBS_LOCK:
+        for k in [k for k, j in JOBS.items() if now - j["created"] > JOB_TTL]:
+            del JOBS[k]
+        if sum(1 for j in JOBS.values() if j["user"] == user and not j["done"]) >= MAX_JOBS_PER_USER:
+            return jsonify({"error": "Two questions are already being answered for you. Wait for one to finish."}), 429
+        job_id = secrets.token_urlsafe(16)
+        JOBS[job_id] = {"user": user, "created": now, "done": False}
+    threading.Thread(target=_run_job, args=(job_id, user, data), daemon=True).start()
+    return jsonify({"job": job_id}), 202
+
+
+@app.route("/api/result/<job_id>")
+def result(job_id):
+    user = (request.headers.get("X-Remote-User") or "").strip()
+    with JOBS_LOCK:
+        j = JOBS.get(job_id)
+        if not j or j["user"] != user or not USER_RE.match(user):
+            return jsonify({"error": "Unknown or expired request."}), 404
+        if not j["done"]:
+            return jsonify({"pending": True}), 200
+        out = {"http_status": j["status"], "result": j["payload"]}
+    return jsonify(out), 200
+
+
+def ask_impl(user, data):
     if not vo or not claude:
         return error("Server not configured -- missing API key(s).", 503)
 
-    data = request.get_json(force=True, silent=True) or {}
     mode = data.get("mode") or "ask"
     question = (data.get("question") or "").strip()
     history = data.get("conversation_history") or []

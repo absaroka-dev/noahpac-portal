@@ -5,6 +5,7 @@ import importlib
 import os
 import sys
 import tempfile
+import time
 import types
 import unittest
 from pathlib import Path
@@ -65,8 +66,18 @@ class ApiFlowTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def post(self, body, user="tester"):
+        """POST starts a job (202); poll the result like the page does and return an object shaped like a normal response."""
         h = {"X-Remote-User": user} if user else {}
-        return self.client.post("/api/ask", json=body, headers=h)
+        r = self.client.post("/api/ask", json=body, headers=h)
+        if r.status_code != 202:
+            return r
+        job = r.get_json()["job"]
+        for _ in range(200):
+            p = self.client.get("/api/result/" + job, headers=h).get_json()
+            if not p.get("pending"):
+                return types.SimpleNamespace(status_code=p["http_status"], get_json=lambda: p["result"])
+            time.sleep(0.02)
+        self.fail("job did not finish")
 
     def ok_body(self, **kw):
         b = {"mode": "standards", "question": "Abnormal pupils for a Class II flyer?", "identifiers_removed": True}
@@ -83,6 +94,13 @@ class ApiFlowTest(unittest.TestCase):
         self.assertIn("blocked", r.get_json()["error"])
         r = self.post(self.ok_body(conversation_history=[{"role": "user", "content": "DOB 01/02/1990"}]))
         self.assertEqual(r.status_code, 400)
+
+    def test_post_returns_at_once_and_results_are_private_to_the_user(self):
+        r = self.client.post("/api/ask", json=self.ok_body(), headers={"X-Remote-User": "alice"})
+        self.assertEqual(r.status_code, 202)
+        job = r.get_json()["job"]
+        self.assertEqual(self.client.get("/api/result/" + job, headers={"X-Remote-User": "bob"}).status_code, 404)
+        self.assertEqual(self.client.get("/api/result/nope", headers={"X-Remote-User": "alice"}).status_code, 404)
 
     def test_unknown_mode(self):
         self.assertEqual(self.post(self.ok_body(mode="shell")).status_code, 400)

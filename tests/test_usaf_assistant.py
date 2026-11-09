@@ -181,10 +181,11 @@ class ModesAndSourceTest(unittest.TestCase):
             self.assertIn(d, self.unit)
 
     def test_nginx_requires_auth_and_forwards_the_user(self):
-        self.assertEqual(self.nginx.count("auth_request            /internal/authelia/authz;"), 2)
+        self.assertEqual(self.nginx.count("auth_request            /internal/authelia/authz;"), 3)  # page, ask, result/health
         self.assertIn("proxy_set_header X-Remote-User $usaf_user;", self.nginx)
         self.assertIn("proxy_pass http://127.0.0.1:8768;", self.nginx)
         self.assertIn("limit_req zone=usaf_assistant_api", self.nginx)
+        self.assertIn("location = /usaf-assistant/api/ask", self.nginx)  # only starting a job is rate limited at 10/min; polling is not
         self.assertIn("alias /var/www/noahpac-portal/usaf-assistant/web/;", self.nginx)  # only static files are served, never the Python or state
 
 
