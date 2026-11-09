@@ -132,7 +132,7 @@
     if (!q) return;
     if (!ack.checked) { ack.focus(); return; }
     input.value = ""; count.textContent = "0 / 6000"; submit.disabled = true;
-    add("msg-user", q);
+    var userBubble = add("msg-user", q);
     var typing = add("typing", "Searching the publications…");
     try {
       var start = await fetch("/usaf-assistant/api/ask", {
@@ -142,6 +142,14 @@
       var sct = start.headers.get("content-type") || "";
       if (!sct.includes("application/json")) { typing.remove(); add("msg-error", "Your session has probably expired. Reload this page and sign in again."); return; }
       var started = await start.json();
+      if (start.status === 409 && started.needs_confirmation) {
+        // The server replaced identifiers with placeholders and sent nothing on: show the cleaned text for the person to check and send again.
+        typing.remove(); userBubble.remove();
+        input.value = started.clean_question; count.textContent = input.value.length + " / 6000";
+        add("msg-note", "Identifying details were replaced with placeholders (" + (started.findings || []).map(function (f) { return f.count + " " + f.label; }).join(", ") +
+          "). Nothing was sent. Read the text below, edit it if needed, and press Send again. This is best effort: names without a rank, units and unusual details cannot be recognised, so check it yourself.");
+        return;
+      }
       if (!start.ok || !started.job) { typing.remove(); add("msg-error", started.error || "Request failed (" + start.status + ")."); return; }
       // Answers take 10-40 s, longer than the 5 s the Cloudflare edge allows for one request, so poll for the result.
       var data = null, fails = 0, t0 = Date.now();
