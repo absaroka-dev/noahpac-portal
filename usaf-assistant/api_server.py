@@ -289,6 +289,11 @@ def library():
         manifest = json.loads((LIBRARY_DIR / "manifest.json").read_text())
     except (OSError, ValueError):
         manifest = {}
+    try:
+        currency = json.loads((STATE_DIR / "currency.json").read_text())
+    except (OSError, ValueError):
+        currency = {}
+    cdocs = currency.get("documents", {})
     docs = []
     for d in rep.get("documents", []):
         if d.get("error"):
@@ -300,12 +305,15 @@ def library():
             age = (datetime.date.today() - datetime.date.fromisoformat(d.get("pub_date"))).days
         except (TypeError, ValueError):
             pass
-        docs.append({"short": m.get("short") or d.get("short"), "title": m.get("title") or d.get("title"), "version": m.get("version") or d.get("version"),
+        c = cdocs.get(d.get("file")) or {}
+        if c.get("status") == "current":
+            age = None  # compared with the official file today, so the generic "old date" warning would only mislead
+        docs.append({"currency": {"status": c.get("status"), "message": c.get("message")} if c else None, "short": m.get("short") or d.get("short"), "title": m.get("title") or d.get("title"), "version": m.get("version") or d.get("version"),
                      "pub_date": d.get("pub_date"), "date_basis": d.get("date_basis"), "category": m.get("category") or d.get("category"),
                      "file": d.get("file"), "chunks": d.get("chunks"), "pages": d.get("pages"), "msd_rows": d.get("msd_rows"),
                      "note": m.get("note") or d.get("note"), "older_than_limit": age is not None and age > STALE_DAYS,
                      "changed_since_index": bool(m) and m.get("pub_date") != d.get("pub_date")})
-    return jsonify({"built": rep.get("built"), "stale_days": STALE_DAYS, "documents": docs})
+    return jsonify({"built": rep.get("built"), "currency_checked": currency.get("checked"), "stale_days": STALE_DAYS, "documents": docs})
 
 
 @app.route("/api/modes")

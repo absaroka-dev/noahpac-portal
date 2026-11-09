@@ -36,6 +36,10 @@
         row.appendChild(el("strong", "", x.short + (x.title ? " — " + x.title : "")));
         row.appendChild(el("div", "", "Version: " + (x.version || x.pub_date || "unknown") + (x.date_basis && x.date_basis !== "manifest" ? " (date taken from " + x.date_basis + ", unconfirmed)" : "")));
         row.appendChild(el("div", "library-meta", (CAT[x.category] || x.category || "Other") + " · " + (x.msd_rows ? x.msd_rows + " standard lines + notes" : (x.chunks + " sections")) + " · " + x.file));
+        if (x.currency && x.currency.message) {
+          var cs = x.currency.status;
+          row.appendChild(el("div", cs === "current" || cs === "verified" ? "library-meta" : "library-warn", (cs === "current" ? "Checked against e-Publishing: " : cs === "verified" ? "Verification: " : "Currency check: ") + x.currency.message));
+        }
         if (x.older_than_limit) row.appendChild(el("div", "library-warn", "Older than " + d.stale_days + " days: check e-Publishing for a newer version."));
         if (x.changed_since_index) row.appendChild(el("div", "library-warn", "The library settings changed after the index was built; the index needs rebuilding."));
         if (x.note) row.appendChild(el("div", "library-meta", "Note: " + x.note));

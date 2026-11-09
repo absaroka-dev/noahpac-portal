@@ -1,0 +1,10 @@
+[Unit]
+Description=Med Standards Assistant: check that the loaded publications are still current
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/var/www/noahpac-portal/ops/usaf-assistant-currency.sh
+TimeoutStartSec=900
+Nice=10

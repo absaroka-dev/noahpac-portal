@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily check of the Med Standards Assistant library
+
+[Timer]
+OnCalendar=*-*-* 06:40:00
+RandomizedDelaySec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
