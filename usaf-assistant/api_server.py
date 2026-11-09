@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""api_server.py -- local Flask API for the USAF Medical Assistant (NARSUM drafting, standards check, waiver packets).
+"""api_server.py -- local Flask API for the Med Standards Assistant (NARSUM drafting, standards check, waiver packets).
 
 POST /api/ask {mode, question, conversation_history, identifiers_removed}
 Hybrid retrieval (Voyage vectors + BM25, fused) over the section-aware index built by ingest_usaf.py, then Claude answers

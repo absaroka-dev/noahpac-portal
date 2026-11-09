@@ -1,4 +1,4 @@
-"""Pre-transmission and post-generation safety checks for the USAF Medical Assistant.
+"""Pre-transmission and post-generation safety checks for the Med Standards Assistant.
 
 Dependency-free so it can be unit tested without the API stack. Extends the clinical assistant's
 identifier patterns with military identifiers. Exact dates are not blocked (clinical timelines need

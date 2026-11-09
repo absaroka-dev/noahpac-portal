@@ -1,4 +1,4 @@
-# USAF Medical Assistant
+# Med Standards Assistant
 
 Private tool at `https://www.noahpac.com/usaf-assistant/` (Authelia 2FA, group `usaf-assistant`). Standards checks, NARSUM drafts and waiver-packet
 help answered only from publications loaded in the library. Input must be de-identified (names, SSN, DoD ID, birth dates, addresses are refused).

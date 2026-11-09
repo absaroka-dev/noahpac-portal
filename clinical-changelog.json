@@ -7,7 +7,7 @@
       "id": "2026-11-08-usaf-assistant",
       "date": "2026-11-08",
       "type": "governance",
-      "title": "USAF Medical Assistant (private)",
+      "title": "Med Standards Assistant (private)",
       "summary": "Added a private, Authelia-protected drafting aid that answers only from loaded USAF publications (medical standards directory, classification directories, PRP and arming guidance).",
       "clinical_change": false,
       "scope": "Private tool; no change to the public clinical tools",

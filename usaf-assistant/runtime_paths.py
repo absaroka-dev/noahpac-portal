@@ -1,4 +1,4 @@
-"""Filesystem locations for the USAF Medical Assistant runtime state.
+"""Filesystem locations for the Med Standards Assistant runtime state.
 
 Production sets the environment variables from its systemd unit so mutable
 artifacts (index, audit log, usage counters, corpus PDFs) live outside the

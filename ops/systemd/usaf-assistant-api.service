@@ -1,5 +1,5 @@
 [Unit]
-Description=Noah PA-C USAF Medical Assistant API
+Description=Noah PA-C Med Standards Assistant API
 After=network-online.target
 Wants=network-online.target
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Builds the USAF Medical Assistant index from the PDFs in LIBRARY_DIR.
+"""Builds the Med Standards Assistant index from the PDFs in LIBRARY_DIR.
 
 Section-aware chunking (textproc.py), per-chunk metadata (document, section, page range, publication date),
 Voyage embeddings, embedded Chroma collection `usaf_docs`. Full rebuild each run; the old index is replaced
