@@ -1,0 +1,40 @@
+[Unit]
+Description=Noah PA-C Med Standards Assistant API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/noahpac-portal/usaf-assistant
+Environment=USAF_ASSISTANT_STATE_DIR=/var/lib/noahpac-usaf-assistant
+Environment=USAF_ASSISTANT_LIBRARY_DIR=/var/lib/noahpac-usaf-assistant/library
+# /etc/usaf-assistant-api.env is root-only and uses shell export syntax (same pattern as the clinical assistant).
+ExecStart=/bin/bash -c 'set -a; source /etc/usaf-assistant-api.env; set +a; exec /opt/noahpac/clinical-assistant/venv/bin/python3 /var/www/noahpac-portal/usaf-assistant/api_server.py'
+Restart=on-failure
+RestartSec=5
+UMask=0027
+
+StateDirectory=noahpac-usaf-assistant
+StateDirectoryMode=0750
+ReadWritePaths=/var/lib/noahpac-usaf-assistant
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

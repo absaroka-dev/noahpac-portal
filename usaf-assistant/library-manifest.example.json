@@ -1,0 +1,8 @@
+{
+  "_help": "Copy to /var/lib/noahpac-usaf-assistant/library/manifest.json. Keys are PDF file names. category: standards, classification, waiver, prp, arming, other. parser 'msd' reads the Medical Standards Directory as a table.",
+  "MSD.pdf": {"short": "MSD", "title": "DAF Medical Standards Directory", "pub_date": "2026-06-05", "category": "standards", "parser": "msd"},
+  "DAFECD.pdf": {"short": "DAFECD", "title": "DAF Enlisted Classification Directory", "pub_date": "2026-04-30", "category": "classification"},
+  "DAFOCD.pdf": {"short": "DAFOCD", "title": "DAF Officer Classification Directory", "pub_date": "2026-04-30", "category": "classification"},
+  "DAFI31-117.pdf": {"short": "DAFI 31-117", "title": "Arming and Use of Force", "pub_date": "2025-01-28", "category": "arming"},
+  "DoDM5210.42_DAFMAN13-501.pdf": {"short": "DoDM 5210.42 / DAFMAN 13-501", "title": "Nuclear Weapons Personnel Reliability Program", "pub_date": "2026-06-02", "category": "prp"}
+}

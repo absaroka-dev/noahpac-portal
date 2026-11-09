@@ -15,9 +15,9 @@ const ROUTES = [
   '/calculators/', '/clinical-assistant/', '/ddx/', '/documents/', '/drugref/',
   '/empiric/', '/labs/', '/lookup/', '/naloxone/', '/opioids/', '/pals/',
   '/peds/', '/readiness/', '/reportable/', '/screener/', '/sepsis/', '/steroids/',
-  '/review/', '/sti-guide/', '/tccc/', '/toxicology/', '/triage/', '/updates/', '/vaccines/', '/wound/',
+  '/review/', '/usaf-assistant/', '/sti-guide/', '/tccc/', '/toxicology/', '/triage/', '/updates/', '/vaccines/', '/wound/',
 ];
-const PRIVATE_ROUTES = ['/clinical-assistant/', '/review/'];
+const PRIVATE_ROUTES = ['/clinical-assistant/', '/review/', '/usaf-assistant/'];
 
 const REMOVED_V2 = [
   'abx2', 'als2', 'anticoag2', 'calculators2', 'ddx2', 'empiric2', 'labs2',
@@ -83,6 +83,7 @@ function localPathForUrl(value) {
   if (!clean.startsWith('/') || clean.startsWith('//')) return null;
   if (clean === '/') return join(ROOT, 'index.html');
   if (clean === '/review/') return join(ROOT, 'clinical-review', 'index.html');
+  if (clean === '/usaf-assistant/') return join(ROOT, 'usaf-assistant', 'web', 'index.html');
   return clean.endsWith('/') ? join(ROOT, clean, 'index.html') : join(ROOT, clean);
 }
 
@@ -90,6 +91,7 @@ async function checkLocal() {
   const pages = ROUTES.map((route) => {
     if (route === '/') return join(ROOT, 'index.html');
     if (route === '/review/') return join(ROOT, 'clinical-review', 'index.html');
+    if (route === '/usaf-assistant/') return join(ROOT, 'usaf-assistant', 'web', 'index.html');
     return join(ROOT, route, 'index.html');
   });
   for (const page of pages) {

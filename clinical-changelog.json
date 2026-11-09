@@ -1,8 +1,24 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-30",
+  "updated": "2026-11-08",
   "policy": "Records substantive clinical-content, safety, and governance changes. Cosmetic-only changes are omitted.",
   "entries": [
+    {
+      "id": "2026-11-08-usaf-assistant",
+      "date": "2026-11-08",
+      "type": "governance",
+      "title": "Med Standards Assistant (private)",
+      "summary": "Added a private, Authelia-protected drafting aid that answers only from loaded USAF publications (medical standards directory, classification directories, PRP and arming guidance).",
+      "clinical_change": false,
+      "scope": "Private tool; no change to the public clinical tools",
+      "affected_routes": ["/usaf-assistant/"],
+      "source_ids": [],
+      "changes": [
+        "De-identified input only: names, SSN, DoD ID, birth dates and addresses are refused before anything leaves the server, and generated text is scanned too.",
+        "Every answer cites the retrieved publications; paragraph and table numbers that cannot be found in the retrieved text are flagged.",
+        "Access is limited to members of an Authelia group, with per-user daily limits and a content-free audit log."
+      ]
+    },
     {
       "id": "2026-10-30-hprc-msk-conversion",
       "date": "2026-10-30",

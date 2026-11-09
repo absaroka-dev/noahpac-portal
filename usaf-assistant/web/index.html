@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="/assets/fonts.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>Med Standards Assistant — Noah PA-C</title>
+<script src="/assets/app-shell.js"></script>
+<link rel="stylesheet" href="/shared.css">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body class="clinical-app legacy-app assistant-app usaf-assistant-app">
+
+<a class="skip-link" href="#main-content">Skip to the assistant</a>
+<header class="app-header app-header--unified">
+  <div class="app-header__inner">
+    <div class="app-header__bar">
+      <a class="app-brand" href="/" target="_top" aria-label="Noah PA-C Clinical Tools home">
+        <span class="app-brand__mark" aria-hidden="true">PA</span>
+        <span class="app-brand__copy"><span class="app-brand__name">Noah PA-C</span><span class="app-brand__product">Clinical Tools</span></span>
+      </a>
+      <div class="app-header__actions">
+        <label class="theme-field"><span class="theme-field__label">Theme</span><select class="theme-select" data-theme-select aria-label="Color theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      </div>
+    </div>
+    <div class="app-header__title">
+      <p class="app-header__eyebrow">Document-grounded drafting aid</p>
+      <h1>Med Standards Assistant</h1>
+      <p class="app-header__lede">Medical standards checks, NARSUM drafts and waiver packet help, answered only from the loaded publications.</p>
+    </div>
+  </div>
+</header>
+
+<div class="wrap legacy-main" id="main-content" role="main" tabindex="-1">
+
+  <div class="privacy-notice" role="note">
+    <strong>De-identified text only.</strong> Do not enter names, SSN, DoD ID, birth dates, addresses or contact details; use placeholders such as [MEMBER] and [DATE]. Text is sent to external model and embedding services.
+  </div>
+
+  <details id="library" class="library">
+    <summary id="library-summary">Loaded publications</summary>
+    <div id="library-body" class="library-body">Loading…</div>
+  </details>
+
+  <div class="mode-tabs" role="tablist" aria-label="Task">
+    <button type="button" role="tab" class="mode-tab" data-mode="standards" aria-selected="true">Standards check</button>
+    <button type="button" role="tab" class="mode-tab" data-mode="narsum" aria-selected="false">NARSUM draft</button>
+    <button type="button" role="tab" class="mode-tab" data-mode="waiver" aria-selected="false">Waiver packet</button>
+    <button type="button" role="tab" class="mode-tab" data-mode="ask" aria-selected="false">General question</button>
+  </div>
+  <p id="mode-help" class="mode-help"></p>
+
+  <div id="chat-log" aria-live="polite"></div>
+
+  <form id="ask-form" class="ask-form">
+    <textarea id="question-input" aria-label="Your message" maxlength="6000" rows="6" autocomplete="off"></textarea>
+    <div class="ask-meta"><span id="question-count">0 / 6000</span></div>
+    <label class="confirm-row"><input type="checkbox" id="identifiers-removed"> I have removed names, SSN, DoD ID, birth dates and other identifiers.</label>
+    <div class="ask-actions">
+      <button type="submit" id="ask-submit" class="primary">Send</button>
+      <button type="button" id="new-conversation" hidden>New conversation</button>
+    </div>
+  </form>
+
+  <p class="foot-note">Decision support and drafting aid only. The cited publications, the responsible flight surgeon or medical authority and the waiver authority govern. Check e-Publishing for the current version.</p>
+</div>
+
+<script src="app.js?v=1"></script>
+</body>
+</html>
