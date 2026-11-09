@@ -42,4 +42,4 @@
 
 @media print{.app-header__actions,.privacy-notice,.workflow-card,.ask-form,.msg-user,.msg-actions{display:none!important}.assistant-workspace{width:100%;padding:0}.conversation-card{border:0;padding:0}.msg-assistant{border:0;background:#fff;color:#000}.usaf-assistant-app .app-footer{width:100%}}
 
-.msg-note{border:1px solid var(--warn,#975a16);background:var(--app-surface-subtle,#fffaf0);color:var(--app-text-secondary,#744210);font-size:13px;line-height:1.5}
+.msg-note{border:1px solid var(--warn);background:var(--app-surface-subtle);color:var(--app-text-secondary);font-size:13px;line-height:1.5}
