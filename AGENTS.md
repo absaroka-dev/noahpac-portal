@@ -20,6 +20,23 @@ Files several people edit often (pull first, keep changes small, expect conflict
 A new tool or private route needs: an entry in `ROUTES` (and `PRIVATE_ROUTES` if behind Authelia) and, if its page is not at `<route>/index.html`, a case in `localPathForUrl`/`checkLocal` in
 `scripts/check-site-health.mjs`.
 
+## Who owns what (to avoid stepping on each other)
+Agreed 2026-11-08. "Owner" means: makes the changes in that area and reviews others' changes to it. Anyone may report a problem anywhere; to change the other side's area, ask them or put the request in the PR description.
+
+| Area | Owner |
+|---|---|
+| Public site and its tools (calculators, references, landing page, `shared.css`, site-wide UI tests, `clinical-changelog.json` entries for them) | **Codex** |
+| Page and interface of the Med Standards Assistant: everything in `usaf-assistant/web/` and `tests/usaf-assistant-ui.spec.ts` | **Codex** |
+| Med Standards Assistant server side: `usaf-assistant/*.py`, `glossary.json`, `modes/`, `ops/`, tests `tests/test_usaf_assistant*.py`, the document library and `manifest.json`, ingestion | **Claude Code** |
+| Everything outside the repo (nginx vhost, Authelia rules, systemd units, env files, `/var/lib` state, Cloudflare, firewall) and the Clinical Assistant backend (`clinical-assistant/*.py`) | **Claude Code** (change only with the owner's say-so; Codex: do not edit these) |
+| Deploy of an already merged commit | whoever merged it |
+
+The two sides meet at a **contract** that neither may change alone. If you need it changed, say so in a PR (or a note to the owner) and update both sides and the tests in the same release:
+- `POST /usaf-assistant/api/ask` with `{mode, question, conversation_history, identifiers_removed: true}` answers `202 {job}` at once (never wait for the model in one request: Cloudflare cuts requests after about 5 s). `GET /usaf-assistant/api/result/<job>` returns `{pending: true}` or `{http_status, result}`; `result` has `answer`, `citations[]` (`tag`, `cite`, `doc`, `title`, `section`, `pages`, `pub_date`, `date_basis`), `warnings[]`, `disclaimer`, `mode`. Errors come as `{error}`.
+- `GET /usaf-assistant/api/library` lists the loaded publications (`short`, `title`, `version`, `pub_date`, `date_basis`, `category`, `file`, `chunks`/`msd_rows`, `note`, `older_than_limit`, `changed_since_index`) and the index build time.
+- What the page must keep doing: require the "identifiers removed" confirmation before sending, poll for results, show the citations, warnings, disclaimer and the publication list with their versions, render model text with `textContent` (never `innerHTML`), load no scripts or styles from other sites (the CSP is `'self'` only, no inline scripts), and keep working when a request returns the HTML sign-in page (show "session expired").
+- What the server must keep doing: refuse identifiers, answer only from retrieved excerpts with validated citations, never log question or answer text.
+
 ## Private tools (Authelia two-factor; everything else on the domain is public)
 `/clinical-assistant/`, `/review/` and `/usaf-assistant/` (Med Standards Assistant). Do not remove an `auth_request` from their nginx locations, and do not link them from anywhere that implies they are public.
 
