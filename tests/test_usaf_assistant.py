@@ -64,6 +64,10 @@ class ChunkingTest(unittest.TestCase):
         self.assertTrue(all(len(c["text"]) <= textproc.MAX_CHARS + 200 for c in chunks))
         self.assertIn("(cont.)", chunks[1]["section"])
 
+    def test_numbered_form_sections_are_headings(self):
+        chunks = textproc.chunk_pages([(1, "(4) HISTORY\ntext a\n(5) TARGETED PHYSICAL EXAM\ntext b\n")])
+        self.assertEqual([c["section"] for c in chunks], ["(4) HISTORY", "(5) TARGETED PHYSICAL EXAM"])
+
     def test_page_numbers_alone_are_dropped(self):
         self.assertNotIn("42", textproc.clean_page_text("text\n  42  \nmore"))
 

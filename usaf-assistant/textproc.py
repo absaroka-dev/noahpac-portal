@@ -16,6 +16,7 @@ _CHAPTER = re.compile(r"^(?:CHAPTER|Chapter|SECTION|Section|ATTACHMENT|Attachmen
 _TABLE = re.compile(r"^(?:TABLE|Table|FIGURE|Figure)\s+[A-Z0-9][\w.\-]*\b.{0,100}$")
 _PARAGRAPH = re.compile(r"^(\d{1,2}(?:\.\d{1,3}){1,5})\.?\s+(?=[A-Z\"(])")
 _AFSC = re.compile(r"^(?:AFSC\s+)?(\d[A-Z]\d[0-9XA-Z]\d|\d{2}[A-Z]\d[A-Z]?)\b[^\n]{0,80}$")
+_NUMBERED_SECTION = re.compile(r"^\(\d{1,2}\)\s+[A-Z][A-Z ,/&()\-]{3,}")
 _PAGE_NUMBER_ONLY = re.compile(r"^\s*(?:Page\s+)?\d{1,4}(?:\s+of\s+\d{1,4})?\s*$", re.I)
 
 
@@ -24,7 +25,7 @@ def classify_line(line):
     s = line.strip()
     if not s or len(s) > 120:
         return None, None
-    if _CHAPTER.match(s):
+    if _CHAPTER.match(s) or _NUMBERED_SECTION.match(s):
         return "chapter", s[:90]
     if _TABLE.match(s):
         return "table", s[:90]

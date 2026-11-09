@@ -125,6 +125,8 @@ def build_chunks(pdf_path, m, aclient):
             raise RuntimeError("no standards rows recognised; the MSD page layout may have changed")
         chunks.extend(textproc.chunk_pages(text_pages))
         return chunks, info
+    if pdf_path.suffix.lower() == ".txt":  # plain-text reference documents (e.g. the NARSUM template guidance): one logical page
+        return textproc.chunk_pages([(1, pdf_path.read_text(errors="replace"))]), {"pages": 1, "ocr_pages": 0}
     pages, ocr_pages = extract_pages(pdf_path, aclient)
     info.update({"pages": len(pages), "ocr_pages": ocr_pages})
     return textproc.chunk_pages(pages), info
@@ -161,7 +163,7 @@ def main():
     ak = os.environ.get("ANTHROPIC_API_KEY")
     aclient = anthropic.Anthropic(api_key=ak) if ak else None
     manifest = load_manifest()
-    pdfs = sorted(LIBRARY_DIR.glob("*.pdf")) if LIBRARY_DIR.exists() else []
+    pdfs = sorted(list(LIBRARY_DIR.glob("*.pdf")) + list(LIBRARY_DIR.glob("*.txt"))) if LIBRARY_DIR.exists() else []
     if not pdfs:
         sys.exit(f"No PDFs in {LIBRARY_DIR}; nothing to index.")
 

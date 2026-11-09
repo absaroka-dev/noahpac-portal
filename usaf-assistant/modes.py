@@ -39,7 +39,7 @@ Output exactly these headings:
     },
     "narsum": {
         "label": "NARSUM draft",
-        "categories": ["standards", "waiver", "classification"],
+        "categories": ["narsum", "standards", "waiver", "classification"],
         "max_tokens": 4500,
         "instructions": None,  # built at call time (template may be supplied by the owner)
     },
