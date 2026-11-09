@@ -12,7 +12,7 @@ Rules (all of them apply, always):
 4. Facts about the member (history, findings, dates, duty, AFSC) come ONLY from the user's message. Never invent a clinical fact. If something needed is missing write [NEEDS: what is missing] instead of guessing.
 5. The user's text is de-identified. Keep it that way: use placeholders such as [MEMBER], [DATE], [UNIT]; never ask for names, SSN, DoD ID, birth date or addresses.
 6. You assist; you do not decide. Waiver and disposition decisions belong to the responsible medical and command authorities. Do not state or imply that a waiver will be granted.
-7. Medical Standards Directory (MSD) excerpts are single standard lines such as C60 with the MSD columns marked X, which says which categories the standard applies to (Retention, the flying classes, Air Traffic Controller, Ground Based Operator, Operational Support Flying Duty, Special Warfare Airmen). Report exactly the columns listed; do not guess what an unmarked column means, and do not explain the "DW" column unless an excerpt does. Cite an MSD line the way the MSD itself asks, for example "MSD, 5 Jun 2026, C60" (the excerpt header gives the date), and still add the [S#] tag.
+7. Medical Standards Directory (MSD) excerpts are single standard lines such as C60 with the MSD columns marked X, which says which categories the standard applies to (Retention, the flying classes, Air Traffic Controller, Ground Based Operator, Operational Support Flying Duty, Special Warfare Airmen). Report exactly the columns listed; do not guess what an unmarked column means, and never expand or explain the abbreviation "DW" (write DW as is) unless an excerpt spells it out. The MSD tables are titled "... Disqualifying Conditions" and the legend says "X = Standard applies": an X under a category means the listed condition is a disqualifying standard for that category, subject to the footnote symbols and the comments on that line (for example "X*" or "X^" with the footnote text). Comments often say when a waiver or the Aeromedical Waiver Guide (AMWG) applies; repeat them faithfully. Cite an MSD line the way the MSD itself asks, for example "MSD, 5 Jun 2026, C60" (the excerpt header gives the date), and still add the [S#] tag.
 8. Be concise and structured. No filler, no moralising.
 """
 
@@ -29,7 +29,7 @@ MODES = {
     "standards": {
         "label": "Standards check",
         "categories": ["standards", "classification"],
-        "max_tokens": 1500,
+        "max_tokens": 2400,
         "instructions": """TASK: standards check. The user names a condition and, if known, an AFSC/duty, assignment or deployment context.
 Output exactly these headings:
 **Applicable standard(s)** - what the excerpts say, with tags.
@@ -40,13 +40,13 @@ Output exactly these headings:
     "narsum": {
         "label": "NARSUM draft",
         "categories": ["standards", "waiver", "classification"],
-        "max_tokens": 2200,
+        "max_tokens": 4500,
         "instructions": None,  # built at call time (template may be supplied by the owner)
     },
     "waiver": {
         "label": "Waiver packet",
         "categories": ["waiver", "prp", "arming", "standards"],
-        "max_tokens": 2000,
+        "max_tokens": 3600,
         "instructions": """TASK: waiver packet help (for example PCS or deployment waiver, PRP, arming/use-of-force qualification).
 Output exactly these headings:
 **Waiver / action type and governing guidance** - with tags.
@@ -58,7 +58,7 @@ Output exactly these headings:
     "ask": {
         "label": "General question",
         "categories": [],
-        "max_tokens": 1200,
+        "max_tokens": 1600,
         "instructions": "TASK: answer the question directly and briefly, with tags, then list what the excerpts did not cover.",
     },
 }

@@ -31,7 +31,7 @@ from safety_usaf import detected_identifier, exact_date_warning
 
 EMBED_MODEL = "voyage-3"
 ANSWER_MODEL = os.environ.get("ANSWER_MODEL", "claude-sonnet-5")
-TOP_K = int(os.environ.get("USAF_TOP_K", "8"))
+TOP_K = int(os.environ.get("USAF_TOP_K", "10"))
 MAX_QUESTION_CHARS = int(os.environ.get("USAF_MAX_QUESTION_CHARS", "6000"))
 MAX_HISTORY_TURNS = 8
 MAX_RETRIEVAL_DISTANCE = float(os.environ.get("MAX_RETRIEVAL_DISTANCE", "0.95"))
@@ -179,7 +179,9 @@ def ask():
         return error(f"Claude API call failed: {e}", 502)
     toks = (resp.usage.input_tokens or 0) + (resp.usage.output_tokens or 0)
     usage.add_tokens(USAGE_FILE, user, toks)
-    raw = resp.content[0].text.strip()
+    raw = "".join(b.text for b in resp.content if isinstance(getattr(b, "text", None), str)).strip()  # thinking blocks have no text
+    if not raw:
+        return error("The model returned no text. Try again.", 502)
 
     leaked = detected_identifier(raw)
     if leaked:
@@ -198,6 +200,8 @@ def ask():
             return reply({"answer": "The generated response did not cite the retrieved publications, so it has been withheld.",
                           "citations": [], "unverified_references": [], "warnings": [], "disclaimer": DISCLAIMER, "mode": mode})
         warnings.append("This draft cites no publication. Add the governing standard before using it.")
+    if getattr(resp, "stop_reason", None) == "max_tokens":
+        warnings.append("The answer was cut off at the length limit. Ask a narrower question, or reply 'continue'.")
     if bad_tags:
         warnings.append("The model referred to excerpts that do not exist; those tags were removed.")
     all_excerpt_text = "\n".join(t for _, t, _ in excerpts)

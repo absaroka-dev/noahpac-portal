@@ -103,6 +103,21 @@ class ApiFlowTest(unittest.TestCase):
         self.assertEqual(d["answer"], "It is probably fine.")
         self.assertTrue(any("cites no publication" in w for w in d["warnings"]))
 
+    def test_thinking_blocks_are_skipped(self):
+        class Think:
+            type = "thinking"
+            thinking = "..."
+        class Text:
+            type = "text"
+            text = "Per C60 [S1]."
+        orig = FakeClaude.messages.create
+        FakeClaude.messages.create = staticmethod(lambda **kw: types.SimpleNamespace(content=[Think(), Text()], usage=types.SimpleNamespace(input_tokens=1, output_tokens=1)))
+        try:
+            d = self.post(self.ok_body()).get_json()
+        finally:
+            FakeClaude.messages.create = orig
+        self.assertEqual(d["answer"], "Per C60 [S1].")
+
     def test_identifier_in_model_output_is_withheld(self):
         FakeClaude.reply = "Contact SSgt Jones about C60 [S1]."
         self.assertIn("withheld", self.post(self.ok_body()).get_json()["answer"])

@@ -18,5 +18,10 @@
   "pha": "periodic health assessment",
   "dafman": "Department of the Air Force Manual",
   "dafi": "Department of the Air Force Instruction",
-  "dodm": "Department of Defense Manual"
+  "dodm": "Department of Defense Manual",
+  "deployment": "DAF Specific Deployment Standards Section V",
+  "deploy": "DAF Specific Deployment Standards Section V",
+  "deployed": "DAF Specific Deployment Standards Section V",
+  "deploying": "DAF Specific Deployment Standards Section V",
+  "deployable": "DAF Specific Deployment Standards Section V"
 }
