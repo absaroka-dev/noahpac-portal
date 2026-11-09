@@ -6,7 +6,7 @@ const ROUTES = [
   '/abx/', '/allergy/', '/antibiogram/', '/anticoag/', '/clinical-assistant/',
   '/clinical-review/', '/ddx/', '/documents/', '/empiric/', '/naloxone/',
   '/readiness/', '/reportable/', '/screener/', '/sti-guide/', '/toxicology/',
-  '/triage/', '/updates/', '/vaccines/', '/wound/',
+  '/triage/', '/updates/', '/usaf-assistant/web/', '/vaccines/', '/wound/',
 ];
 
 for (const width of [375, 1440]) {

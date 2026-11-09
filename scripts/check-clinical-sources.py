@@ -72,8 +72,10 @@ def validate_manifest(path: Path, claims_path: Path = DEFAULT_CLAIMS) -> tuple[d
         route = tool.get("path", "")
         if not route.startswith("/") or not route.endswith("/"):
             errors.append(f"tool {tool_id} has invalid path {route!r}")
-        elif not (REPO / route.strip("/") / "index.html").is_file():
-            errors.append(f"tool {tool_id} route does not exist: {route}")
+        else:
+            route_root = REPO / route.strip("/")
+            if not ((route_root / "index.html").is_file() or (route_root / "web" / "index.html").is_file()):
+                errors.append(f"tool {tool_id} route does not exist: {route}")
         monitor = tool.get("monitor")
         if monitor and not (REPO / monitor).is_file():
             errors.append(f"tool {tool_id} monitor does not exist: {monitor}")

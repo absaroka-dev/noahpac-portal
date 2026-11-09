@@ -16,6 +16,7 @@
   var log = document.getElementById("chat-log"), form = document.getElementById("ask-form"), input = document.getElementById("question-input");
   var submit = document.getElementById("ask-submit"), ack = document.getElementById("identifiers-removed");
   var newConv = document.getElementById("new-conversation"), count = document.getElementById("question-count"), help = document.getElementById("mode-help");
+  var empty = document.getElementById("empty-state");
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".mode-tab"));
 
   var CAT = { standards: "Medical standards", classification: "Classification", arming: "Arming and use of force", prp: "Personnel Reliability Program", waiver: "Waiver guide", narsum: "NARSUM template", other: "Other" };
@@ -45,17 +46,31 @@
   loadLibrary();
 
   function setMode(m) {
-    if (m !== mode) { history = []; log.textContent = ""; newConv.hidden = true; }
+    if (m !== mode) { history = []; log.textContent = ""; newConv.hidden = true; empty.hidden = false; }
     mode = m;
-    tabs.forEach(function (t) { t.setAttribute("aria-selected", t.dataset.mode === m ? "true" : "false"); });
+    tabs.forEach(function (t) {
+      var selected = t.dataset.mode === m;
+      t.setAttribute("aria-selected", selected ? "true" : "false");
+      t.tabIndex = selected ? 0 : -1;
+    });
     help.textContent = HELP[m]; input.placeholder = PLACEHOLDER[m];
   }
   tabs.forEach(function (t) { t.addEventListener("click", function () { setMode(t.dataset.mode); }); });
+  document.querySelector(".mode-tabs").addEventListener("keydown", function (event) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    var current = tabs.indexOf(document.activeElement), next;
+    if (event.key === "Home") next = 0;
+    else if (event.key === "End") next = tabs.length - 1;
+    else next = (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+    setMode(tabs[next].dataset.mode); tabs[next].focus();
+  });
   setMode("standards");
   input.addEventListener("input", function () { count.textContent = input.value.length + " / 6000"; });
-  newConv.addEventListener("click", function () { history = []; log.textContent = ""; newConv.hidden = true; });
+  newConv.addEventListener("click", function () { history = []; log.textContent = ""; newConv.hidden = true; empty.hidden = false; input.focus(); });
 
   function add(cls, text) {
+    empty.hidden = true;
     var d = document.createElement("div"); d.className = "msg " + cls; d.textContent = text; log.appendChild(d);
     d.scrollIntoView({ behavior: "smooth", block: "end" }); return d;
   }
@@ -81,6 +96,7 @@
   }
 
   function addAnswer(data) {
+    empty.hidden = true;
     var d = document.createElement("div"); d.className = "msg msg-assistant";
     d.appendChild(renderAnswer(data.answer));
     var cites = (data.citations || []).map(function (c) {
@@ -148,4 +164,6 @@
       typing.remove(); add("msg-error", "Network error: " + err.message);
     } finally { submit.disabled = false; input.focus(); }
   });
+
+  if (window.lucide) window.lucide.createIcons();
 })();

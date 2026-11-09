@@ -2,15 +2,15 @@
 
 Clinical reference portal for [noahpac.com](https://noahpac.com). The public
 point-of-care tools are fast, mobile-friendly, and require no login. The
-Clinical Assistant and Clinical Review Portal are private operator tools
-protected by Authelia two-factor authentication.
+Clinical Assistant, Med Standards Assistant, and Clinical Review Portal are
+private operator tools protected by Authelia two-factor authentication.
 
 ## Structure
 
 The public interface is primarily static HTML/CSS/JavaScript with no framework
-or build step. Nginx serves files directly from the production checkout. Three
+or build step. Nginx serves files directly from the production checkout. Four
 small loopback-only services support antibiogram import, the Clinical
-Assistant, and the Clinical Review Portal.
+Assistant, the Med Standards Assistant, and the Clinical Review Portal.
 
 **Root** (`index.html`) — static portal homepage and navigation shell.
 
@@ -19,6 +19,11 @@ Assistant, and the Clinical Review Portal.
 **Clinical Assistant** (`clinical-assistant/`) — Authelia-protected,
 document-grounded reference assistant backed by a loopback-only Python service
 and a local Chroma index.
+
+**Med Standards Assistant** (`usaf-assistant/`) — Authelia-protected USAF
+standards, NARSUM, and waiver drafting aid grounded only in its separately
+curated publication library. Inputs are identifier-screened before retrieval
+or model processing.
 
 **Clinical Review Portal** (`clinical-review/`, published privately at
 `/review/`) — Authelia-protected clinician acknowledgement queue backed by a
@@ -153,7 +158,9 @@ outside the web root; migration and recovery details are in
 [`docs/CLINICAL_ASSISTANT_RUNTIME.md`](docs/CLINICAL_ASSISTANT_RUNTIME.md).
 Its direct Python dependencies are pinned in
 `clinical-assistant/requirements.txt` and installed with the documented
-root-only dependency installer.
+root-only dependency installer. The Med Standards Assistant's architecture,
+library-update procedure, limits, and state paths are documented in
+[`usaf-assistant/README.md`](usaf-assistant/README.md).
 
 Clinical ownership, review state, cadence, and authoritative-source mappings
 for all 28 registered tools are recorded in `clinical-review.json`. The weekly
@@ -172,10 +179,12 @@ documented Nginx locations:
 | `antibiogram-api.service` | `127.0.0.1:8765` | Extract facility data from ND HHS antibiogram PDFs for the import workflow | `/etc/antibiogram-api.env` |
 | `clinical-assistant-api.service` | `127.0.0.1:8766` | Retrieve from the local Chroma reference index and produce document-grounded answers; Authelia-protected | `/etc/clinical-assistant-api.env`, `/var/lib/noahpac-clinical-assistant/` |
 | `noahpac-review-portal.service` | `127.0.0.1:8767` | Authenticated clinical-review queue, evidence packets, and append-only audit workflow | `/var/lib/noahpac-monitor/` |
+| `usaf-assistant-api.service` | `127.0.0.1:8768` | Retrieve from the curated USAF publication index and produce citation-checked standards or drafting support; Authelia-protected | `/etc/usaf-assistant-api.env`, `/var/lib/noahpac-usaf-assistant/` |
 
 See `docs/CLINICAL_ASSISTANT_RUNTIME.md` and
-`docs/CLINICAL_REVIEW_PORTAL.md` before changing either private service or its
-authentication boundary.
+`docs/CLINICAL_REVIEW_PORTAL.md` before changing the corresponding private
+service or authentication boundary. See `usaf-assistant/README.md` before
+changing the USAF publication library, service, or access boundary.
 
 ## External services and APIs
 
@@ -184,6 +193,7 @@ authentication boundary.
 | Public runtime | `lookup/` | [NLM Clinical Tables](https://clinicaltables.nlm.nih.gov/) |
 | Public runtime | `drugref/` | [openFDA](https://open.fda.gov/) |
 | Private runtime | `clinical-assistant/` | Voyage AI embeddings and Anthropic Claude; server-side only and identifier-screened |
+| Private runtime | `usaf-assistant/` | Voyage AI embeddings and Anthropic Claude; server-side only, identifier-screened, and restricted to the loaded USAF publication library |
 | Scheduled refresh | `screener/update_uspstf.py` | [USPSTF Prevention TaskForce](https://www.uspreventiveservicestaskforce.org/apps/api.jsp) |
 | Administrative import | `antibiogram/auto_update.py` and import API | [Anthropic Claude](https://console.anthropic.com/); server-side only |
 

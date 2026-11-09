@@ -22,12 +22,13 @@ function findPageStylesheets(root: string): string[] {
     const full = join(root, entry);
     try {
       if (statSync(full).isDirectory()) {
-        const candidate = join(full, "style.css");
-        try {
-          statSync(candidate);
-          results.push(candidate);
-        } catch {
-          // no style.css in this dir
+        for (const candidate of [join(full, "style.css"), join(full, "web", "style.css")]) {
+          try {
+            statSync(candidate);
+            results.push(candidate);
+          } catch {
+            // no stylesheet at this supported page location
+          }
         }
       }
     } catch {

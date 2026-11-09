@@ -8,7 +8,8 @@
 <title>Med Standards Assistant — Noah PA-C</title>
 <script src="/assets/app-shell.js"></script>
 <link rel="stylesheet" href="/shared.css">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
+<script src="/lib/lucide.min.js"></script>
 </head>
 <body class="clinical-app legacy-app assistant-app usaf-assistant-app">
 
@@ -32,40 +33,71 @@
   </div>
 </header>
 
-<div class="wrap legacy-main" id="main-content" role="main" tabindex="-1">
+<main class="assistant-workspace" id="main-content" tabindex="-1">
 
-  <div class="privacy-notice" role="note">
-    <strong>De-identified text only.</strong> Do not enter names, SSN, DoD ID, birth dates, addresses or contact details; use placeholders such as [MEMBER] and [DATE]. Text is sent to external model and embedding services.
-  </div>
+  <aside class="privacy-notice" role="note" aria-label="Privacy requirement">
+    <span class="notice-icon" aria-hidden="true"><i data-lucide="shield-alert"></i></span>
+    <div>
+      <strong>De-identified input only</strong>
+      <p>Do not enter names, SSN, DoD ID, birth dates, addresses, or contact details. Use placeholders such as <span class="placeholder-token">[MEMBER]</span> and <span class="placeholder-token">[DATE]</span>. Text is sent to external model and embedding services.</p>
+    </div>
+  </aside>
 
-  <details id="library" class="library">
-    <summary id="library-summary">Loaded publications</summary>
-    <div id="library-body" class="library-body">Loading…</div>
-  </details>
+  <section class="workflow-card" aria-labelledby="workflow-title">
+    <header class="workflow-heading">
+      <div>
+        <p class="section-eyebrow">Assistant workflow</p>
+        <h2 id="workflow-title">Choose what you’re working on</h2>
+      </div>
+      <span class="grounding-badge"><i data-lucide="library"></i> Loaded sources only</span>
+    </header>
 
-  <div class="mode-tabs" role="tablist" aria-label="Task">
-    <button type="button" role="tab" class="mode-tab" data-mode="standards" aria-selected="true">Standards check</button>
-    <button type="button" role="tab" class="mode-tab" data-mode="narsum" aria-selected="false">NARSUM draft</button>
-    <button type="button" role="tab" class="mode-tab" data-mode="waiver" aria-selected="false">Waiver packet</button>
-    <button type="button" role="tab" class="mode-tab" data-mode="ask" aria-selected="false">General question</button>
-  </div>
-  <p id="mode-help" class="mode-help"></p>
+    <div class="mode-tabs" role="tablist" aria-label="Task">
+      <button type="button" role="tab" class="mode-tab" data-mode="standards" aria-selected="true" aria-controls="mode-help"><span>Standards</span><small>Check applicability</small></button>
+      <button type="button" role="tab" class="mode-tab" data-mode="narsum" aria-selected="false" aria-controls="mode-help"><span>NARSUM</span><small>Build a draft</small></button>
+      <button type="button" role="tab" class="mode-tab" data-mode="waiver" aria-selected="false" aria-controls="mode-help"><span>Waiver</span><small>Review a packet</small></button>
+      <button type="button" role="tab" class="mode-tab" data-mode="ask" aria-selected="false" aria-controls="mode-help"><span>Ask</span><small>Search guidance</small></button>
+    </div>
+    <p id="mode-help" class="mode-help" role="tabpanel"></p>
 
-  <div id="chat-log" aria-live="polite"></div>
+    <details id="library" class="library">
+      <summary><span><i data-lucide="files"></i><span id="library-summary">Loaded publications</span></span><span class="library-action">View source set</span></summary>
+      <div id="library-body" class="library-body">Loading…</div>
+    </details>
+  </section>
+
+  <section class="conversation-card" aria-label="Assistant conversation">
+    <div id="empty-state" class="empty-state">
+      <span class="empty-state__icon" aria-hidden="true"><i data-lucide="message-circle-question"></i></span>
+      <div>
+        <p class="section-eyebrow">Ready to search</p>
+        <h2>Ask against the loaded USAF publications</h2>
+        <p>Enter only the facts needed for the selected workflow. The answer will identify its source excerpts and any items that still need verification.</p>
+      </div>
+    </div>
+    <div id="chat-log" aria-live="polite" aria-label="Conversation"></div>
+  </section>
 
   <form id="ask-form" class="ask-form">
-    <textarea id="question-input" aria-label="Your message" maxlength="6000" rows="6" autocomplete="off"></textarea>
-    <div class="ask-meta"><span id="question-count">0 / 6000</span></div>
-    <label class="confirm-row"><input type="checkbox" id="identifiers-removed"> I have removed names, SSN, DoD ID, birth dates and other identifiers.</label>
-    <div class="ask-actions">
-      <button type="submit" id="ask-submit" class="primary">Send</button>
-      <button type="button" id="new-conversation" hidden>New conversation</button>
+    <div class="composer-heading">
+      <label for="question-input">De-identified request</label>
+      <span id="question-count">0 / 6000</span>
     </div>
+    <textarea id="question-input" aria-describedby="composer-note" maxlength="6000" rows="5" autocomplete="off" required></textarea>
+    <label class="confirm-row"><input type="checkbox" id="identifiers-removed" required><span>I confirm that I removed names, SSN, DoD ID, birth dates, contact details, and other identifiers.</span></label>
+    <div class="ask-actions">
+      <button type="submit" id="ask-submit" class="primary"><i data-lucide="search"></i><span>Search publications</span></button>
+      <button type="button" id="new-conversation" class="secondary" hidden><i data-lucide="rotate-ccw"></i><span>New conversation</span></button>
+    </div>
+    <p class="composer-note" id="composer-note"><i data-lucide="clock-3"></i> Document retrieval and drafting usually take 10–40 seconds.</p>
   </form>
 
-  <p class="foot-note">Decision support and drafting aid only. The cited publications, the responsible flight surgeon or medical authority and the waiver authority govern. Check e-Publishing for the current version.</p>
-</div>
+  <footer class="app-footer legacy-footer">
+    <p class="app-footer__source">Decision support and drafting aid only. The cited publications, responsible flight surgeon or medical authority, and waiver authority govern. Verify publication currency in e-Publishing.</p>
+    <p class="app-footer__meta">© <span data-current-year></span> Noah PA-C</p>
+  </footer>
+</main>
 
-<script src="app.js?v=1"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>
