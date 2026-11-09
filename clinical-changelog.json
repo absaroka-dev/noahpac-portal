@@ -12,6 +12,7 @@
       "clinical_change": false,
       "scope": "Private tool; no change to the public clinical tools",
       "affected_routes": ["/usaf-assistant/"],
+      "source_ids": [],
       "changes": [
         "De-identified input only: names, SSN, DoD ID, birth dates and addresses are refused before anything leaves the server, and generated text is scanned too.",
         "Every answer cites the retrieved publications; paragraph and table numbers that cannot be found in the retrieved text are flagged.",
