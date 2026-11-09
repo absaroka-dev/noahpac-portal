@@ -20,6 +20,8 @@ help answered only from publications loaded in the library. Input must be de-ide
 2. `sudo /var/www/noahpac-portal/ops/usaf-assistant-ingest.sh --dry-run` (check page and chunk counts), then without `--dry-run`, then `sudo systemctl restart usaf-assistant-api`.
 3. A standard is cited as the MSD asks: "MSD, 5 Jun 2026, C60".
 
+The page shows the list of loaded publications with their versions (`/api/library`, built from `ingest_report.json` plus `manifest.json`; the `version` and `note` fields in the manifest are what the user sees). Text documents (`.txt`) can be loaded like PDFs; `modes/narsum_template.txt` is the NARSUM layout used by the NARSUM mode.
+
 ## Adding a person
 Add `usaf-assistant` to the user's `groups` in `/opt/stacks/authelia/config/users_database.yml`, restart the `authelia` container.
 

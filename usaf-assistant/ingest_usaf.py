@@ -187,7 +187,8 @@ def main():
                           "category": m.get("category", "other"), "section": c["section"], "cite": c.get("cite") or "",
                           "page_start": c["page_start"], "page_end": c["page_end"],
                           "pub_date": date, "date_basis": basis, "chunk_index": i})
-        info.update({"file": pdf_path.name, "short": short, "chunks": len(chunks), "in_manifest": bool(m), "pub_date": date, "date_basis": basis})
+        info.update({"file": pdf_path.name, "short": short, "title": m.get("title", ""), "version": m.get("version", ""), "category": m.get("category", "other"),
+                     "note": m.get("note", ""), "chunks": len(chunks), "in_manifest": bool(m), "pub_date": date, "date_basis": basis})
         report.append(info)
         print(f"  {info}" + ("" if m else "  (not in manifest.json)"))
 

@@ -2,6 +2,7 @@
 Needs the clinical-assistant venv (chromadb, flask); skipped elsewhere:
   /opt/noahpac/clinical-assistant/venv/bin/python3 -m unittest tests.test_usaf_assistant_api"""
 import importlib
+import json
 import os
 import sys
 import tempfile
@@ -101,6 +102,15 @@ class ApiFlowTest(unittest.TestCase):
         job = r.get_json()["job"]
         self.assertEqual(self.client.get("/api/result/" + job, headers={"X-Remote-User": "bob"}).status_code, 404)
         self.assertEqual(self.client.get("/api/result/nope", headers={"X-Remote-User": "alice"}).status_code, 404)
+
+    def test_library_lists_loaded_publications_and_needs_sign_in(self):
+        self.assertEqual(self.client.get("/api/library").status_code, 401)
+        (Path(self.tmp.name) / "ingest_report.json").write_text(json.dumps({"built": "2026-11-08T20:55:02", "documents": [
+            {"file": "MSD.pdf", "short": "MSD", "pub_date": "2020-01-01", "date_basis": "manifest", "chunks": 5, "msd_rows": 650, "category": "standards"}]}))
+        d = self.client.get("/api/library", headers={"X-Remote-User": "u"}).get_json()
+        self.assertEqual(d["built"], "2026-11-08T20:55:02")
+        self.assertEqual(d["documents"][0]["short"], "MSD")
+        self.assertTrue(d["documents"][0]["older_than_limit"])
 
     def test_unknown_mode(self):
         self.assertEqual(self.post(self.ok_body(mode="shell")).status_code, 400)

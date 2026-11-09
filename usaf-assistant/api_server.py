@@ -28,7 +28,7 @@ import modes as modes_mod
 import refcheck
 import retrieval
 import usage
-from runtime_paths import AUDIT_LOG, CHROMA_DIR, HEARTBEAT_FILE, STATE_DIR, USAGE_FILE
+from runtime_paths import AUDIT_LOG, CHROMA_DIR, HEARTBEAT_FILE, LIBRARY_DIR, STATE_DIR, USAGE_FILE
 from safety_usaf import detected_identifier, exact_date_warning
 
 EMBED_MODEL = "voyage-3"
@@ -273,6 +273,39 @@ def ask_impl(user, data):
                 cited=len(tags), unverified=len(unverified), tokens=toks, best_dist=best_dist, best_bm25=round(best_bm25, 2))
     return reply({"answer": answer, "citations": citations, "unverified_references": unverified, "warnings": warnings,
                   "disclaimer": DISCLAIMER, "mode": mode, "calls_today": calls, "calls_limit": DAILY_CALLS})
+
+
+@app.route("/api/library")
+def library():
+    """What the assistant is working from: every loaded publication with its version/date, so the user can check it against e-Publishing."""
+    user = (request.headers.get("X-Remote-User") or "").strip()
+    if not USER_RE.match(user):
+        return jsonify({"error": "Sign in required."}), 401
+    try:
+        rep = json.loads((STATE_DIR / "ingest_report.json").read_text())
+    except (OSError, ValueError):
+        rep = {}
+    try:
+        manifest = json.loads((LIBRARY_DIR / "manifest.json").read_text())
+    except (OSError, ValueError):
+        manifest = {}
+    docs = []
+    for d in rep.get("documents", []):
+        if d.get("error"):
+            docs.append({"short": d.get("file"), "error": d["error"]})
+            continue
+        m = manifest.get(d.get("file"), {})
+        age = None
+        try:
+            age = (datetime.date.today() - datetime.date.fromisoformat(d.get("pub_date"))).days
+        except (TypeError, ValueError):
+            pass
+        docs.append({"short": m.get("short") or d.get("short"), "title": m.get("title") or d.get("title"), "version": m.get("version") or d.get("version"),
+                     "pub_date": d.get("pub_date"), "date_basis": d.get("date_basis"), "category": m.get("category") or d.get("category"),
+                     "file": d.get("file"), "chunks": d.get("chunks"), "pages": d.get("pages"), "msd_rows": d.get("msd_rows"),
+                     "note": m.get("note") or d.get("note"), "older_than_limit": age is not None and age > STALE_DAYS,
+                     "changed_since_index": bool(m) and m.get("pub_date") != d.get("pub_date")})
+    return jsonify({"built": rep.get("built"), "stale_days": STALE_DAYS, "documents": docs})
 
 
 @app.route("/api/modes")

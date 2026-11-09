@@ -18,6 +18,32 @@
   var newConv = document.getElementById("new-conversation"), count = document.getElementById("question-count"), help = document.getElementById("mode-help");
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".mode-tab"));
 
+  var CAT = { standards: "Medical standards", classification: "Classification", arming: "Arming and use of force", prp: "Personnel Reliability Program", waiver: "Waiver guide", narsum: "NARSUM template", other: "Other" };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; }
+  async function loadLibrary() {
+    var box = document.getElementById("library-body"), sum = document.getElementById("library-summary");
+    try {
+      var r = await fetch("/usaf-assistant/api/library", { cache: "no-store" });
+      if (!(r.headers.get("content-type") || "").includes("application/json")) throw new Error("session");
+      var d = await r.json(), docs = d.documents || [];
+      sum.textContent = "Loaded publications (" + docs.length + ") — index built " + (d.built ? d.built.slice(0, 10) : "unknown");
+      box.textContent = "";
+      box.appendChild(el("p", "library-note", "Answers use only these publications, at exactly these versions. Compare each version with e-Publishing before relying on an answer; the assistant cannot tell whether a newer one exists."));
+      docs.forEach(function (x) {
+        var row = el("div", "library-row");
+        if (x.error) { row.appendChild(el("strong", "", x.short)); row.appendChild(el("div", "library-warn", "Could not be read: " + x.error)); box.appendChild(row); return; }
+        row.appendChild(el("strong", "", x.short + (x.title ? " — " + x.title : "")));
+        row.appendChild(el("div", "", "Version: " + (x.version || x.pub_date || "unknown") + (x.date_basis && x.date_basis !== "manifest" ? " (date taken from " + x.date_basis + ", unconfirmed)" : "")));
+        row.appendChild(el("div", "library-meta", (CAT[x.category] || x.category || "Other") + " · " + (x.msd_rows ? x.msd_rows + " standard lines + notes" : (x.chunks + " sections")) + " · " + x.file));
+        if (x.older_than_limit) row.appendChild(el("div", "library-warn", "Older than " + d.stale_days + " days: check e-Publishing for a newer version."));
+        if (x.changed_since_index) row.appendChild(el("div", "library-warn", "The library settings changed after the index was built; the index needs rebuilding."));
+        if (x.note) row.appendChild(el("div", "library-meta", "Note: " + x.note));
+        box.appendChild(row);
+      });
+    } catch (e) { box.textContent = "Could not load the list. Reload the page."; }
+  }
+  loadLibrary();
+
   function setMode(m) {
     if (m !== mode) { history = []; log.textContent = ""; newConv.hidden = true; }
     mode = m;
