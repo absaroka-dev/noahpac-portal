@@ -90,6 +90,7 @@ async function checkLocal() {
   const pages = ROUTES.map((route) => {
     if (route === '/') return join(ROOT, 'index.html');
     if (route === '/review/') return join(ROOT, 'clinical-review', 'index.html');
+    if (route === '/usaf-assistant/') return join(ROOT, 'usaf-assistant', 'web', 'index.html');
     return join(ROOT, route, 'index.html');
   });
   for (const page of pages) {
