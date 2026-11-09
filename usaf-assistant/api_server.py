@@ -29,7 +29,7 @@ import refcheck
 import retrieval
 import usage
 from runtime_paths import AUDIT_LOG, CHROMA_DIR, HEARTBEAT_FILE, LIBRARY_DIR, STATE_DIR, USAGE_FILE
-from safety_usaf import detected_identifier, exact_date_warning
+from safety_usaf import detected_identifier, exact_date_warning, redact
 
 EMBED_MODEL = "voyage-3"
 ANSWER_MODEL = os.environ.get("ANSWER_MODEL", "claude-sonnet-5")
@@ -158,6 +158,19 @@ def ask():
     if not USER_RE.match(user):
         return jsonify({"error": "Sign in required."}), 401
     data = request.get_json(force=True, silent=True) or {}
+    # Identifiers are replaced with placeholders, never sent on: the page shows the cleaned text and the person sends it (or edits it) again.
+    # Earlier turns of the conversation are cleaned silently. Only counts of what was replaced are logged, never the text.
+    q = data.get("question")
+    if isinstance(q, str) and q.strip():
+        clean, findings = redact(q)
+        if findings:
+            usage.audit(AUDIT_LOG, user=user, mode=data.get("mode"), outcome="redaction_offered", replaced={f["placeholder"]: f["count"] for f in findings}, qlen=len(q))
+            return jsonify({"needs_confirmation": True, "clean_question": clean, "findings": findings,
+                            "message": "Identifying details were replaced with placeholders. Check the text, edit it if needed, and send it again."}), 409
+    if isinstance(data.get("conversation_history"), list):
+        for turn in data["conversation_history"]:
+            if isinstance(turn, dict) and isinstance(turn.get("content"), str):
+                turn["content"] = redact(turn["content"])[0]
     now = time.time()
     with JOBS_LOCK:
         for k in [k for k, j in JOBS.items() if now - j["created"] > JOB_TTL]:

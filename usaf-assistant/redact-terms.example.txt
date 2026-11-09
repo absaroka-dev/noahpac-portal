@@ -1,0 +1,6 @@
+# Words the Med Standards Assistant always replaces with [TERM] before anything is sent on (case does not matter, whole words only).
+# One per line; blank lines and lines starting with # are ignored; entries shorter than 3 characters are ignored.
+# Good candidates: base names, wing/squadron names, clinic names, names of people you often write about.
+# Install as /etc/usaf-assistant/redact-terms.txt (readable by www-data) and run: sudo systemctl restart usaf-assistant-api
+# Minot
+# Ramstein Air Base

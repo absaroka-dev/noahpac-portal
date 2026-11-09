@@ -88,13 +88,37 @@ class ApiFlowTest(unittest.TestCase):
     def test_requires_user_header(self):
         self.assertEqual(self.post(self.ok_body(), user=None).status_code, 401)
 
+    def test_identifiers_are_replaced_and_offered_back_never_sent_on(self):
+        r = self.client.post("/api/ask", json=self.ok_body(question="SSgt Smith, SSN 123-45-6789, has asthma"), headers={"X-Remote-User": "u"})
+        self.assertEqual(r.status_code, 409)
+        d = r.get_json()
+        self.assertTrue(d["needs_confirmation"])
+        self.assertEqual(d["clean_question"], "SSgt [NAME], SSN [SSN], has asthma")
+        self.assertEqual({f["placeholder"]: f["count"] for f in d["findings"]}, {"[SSN]": 1, "[NAME]": 1})
+        self.assertNotIn("123-45-6789", json.dumps(d["findings"]))
+        # sending the cleaned text goes through (idempotent: placeholders are not identifiers)
+        r2 = self.post(self.ok_body(question=d["clean_question"]))
+        self.assertEqual(r2.status_code, 200)
+        log = (Path(self.tmp.name) / "audit.jsonl").read_text()
+        self.assertNotIn("123-45-6789", log)
+        self.assertIn("redaction_offered", log)
+
+    def test_history_is_cleaned_silently(self):
+        seen = {}
+        orig = FakeClaude.messages.create
+        FakeClaude.messages.create = staticmethod(lambda **kw: (seen.update(kw), orig(**kw))[1])
+        try:
+            FakeClaude.reply = "Ok [S1]."
+            r = self.post(self.ok_body(conversation_history=[{"role": "user", "content": "call 555-123-4567"}]))
+        finally:
+            FakeClaude.messages.create = orig
+        self.assertEqual(r.status_code, 200)
+        self.assertNotIn("555-123-4567", json.dumps(seen["messages"]))
+
     def test_requires_confirmation_and_blocks_identifiers(self):
         self.assertEqual(self.post(self.ok_body(identifiers_removed=False)).status_code, 400)
-        r = self.post(self.ok_body(question="SSgt Smith 123-45-6789 pupils"))
-        self.assertEqual(r.status_code, 400)
-        self.assertIn("blocked", r.get_json()["error"])
-        r = self.post(self.ok_body(conversation_history=[{"role": "user", "content": "DOB 01/02/1990"}]))
-        self.assertEqual(r.status_code, 400)
+        r = self.client.post("/api/ask", json=self.ok_body(question="SSgt Smith 123-45-6789 pupils"), headers={"X-Remote-User": "u"})
+        self.assertEqual(r.status_code, 409)  # offered back cleaned, not forwarded
 
     def test_post_returns_at_once_and_results_are_private_to_the_user(self):
         r = self.client.post("/api/ask", json=self.ok_body(), headers={"X-Remote-User": "alice"})

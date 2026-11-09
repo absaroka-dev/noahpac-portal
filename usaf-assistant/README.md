@@ -29,6 +29,9 @@ The page shows the list of loaded publications with their versions (`/api/librar
 Results: `currency.json` in the state directory (shown on the page), textfile metrics `usaf_library_*` and four Grafana alerts (`usaf-library-currency.yaml` in the monitoring stack). A publication that is `current` no longer shows the generic "older than 540 days" warning. Needs Chromium from Playwright (`PLAYWRIGHT_CHROMIUM` overrides the search) and `tests/node_modules/@playwright/test`.
 Loaded from e-Publishing on 2026-11-08 and monitored: DAFI 31-117, DoDM 5210.42/DAFMAN 13-501 (GM), DAFMAN 48-123, DAFI 36-2910 (GM). Not on e-Publishing (CAC): MSD, DAFECD, DAFOCD, NARSUM template.
 
+## Identifiers are replaced, not just refused
+`safety_usaf.redact()` replaces SSN, DoD ID, phone, email, street address, labelled birth dates and record numbers, and names after a rank/title or a label ("Name:", "named") with placeholders (`[SSN]`, `[NAME]`...). `POST /api/ask` then answers `409 {needs_confirmation, clean_question, findings}` and sends nothing on; the page puts the cleaned text back in the input for the person to check and send again. Earlier turns are cleaned silently. Only counts are logged (`redaction_offered`), never text. Exact calendar dates are not replaced (warning only) and dates inside publication citations ("MSD, 5 Jun 2026, C60") are untouched. Names that follow no rank or label, units and unusual details cannot be found by rules: list known words (bases, units, people) in `/etc/usaf-assistant/redact-terms.txt` (see `redact-terms.example.txt`); `detected_identifier()` stays as the final gate.
+
 ## Adding a person
 Add `usaf-assistant` to the user's `groups` in `/opt/stacks/authelia/config/users_database.yml`, restart the `authelia` container.
 

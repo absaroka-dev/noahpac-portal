@@ -50,6 +50,38 @@ class SafetyTest(unittest.TestCase):
         self.assertFalse(safety_usaf.exact_date_warning("seen 3 months ago"))
 
 
+class RedactionTest(unittest.TestCase):
+    def red(self, text):
+        return safety_usaf.redact(text, terms_file="/nonexistent")
+
+    def test_structured_identifiers_become_placeholders(self):
+        clean, f = self.red("SSgt Smith (SSN 123-45-6789, DoD ID: 1234567890) call 555-123-4567 or a.b@x.com; 12 Oak Street; DOB 01/02/1990; MRN: AB1234")
+        for token in ("Smith", "123-45-6789", "1234567890", "555-123-4567", "a.b@x.com", "Oak Street", "01/02/1990", "AB1234"):
+            self.assertNotIn(token, clean)
+        for ph in ("[NAME]", "[SSN]", "[DOD-ID]", "[PHONE]", "[EMAIL]", "[ADDRESS]", "[DOB]", "[MRN]"):
+            self.assertIn(ph, clean)
+        self.assertIsNone(safety_usaf.detected_identifier(clean))
+        self.assertNotIn("Smith", str(f))  # findings carry counts only
+
+    def test_names_after_labels_and_titles_but_not_ordinary_words(self):
+        clean, _ = self.red("Name: Jane Public; named Mary Smith; Lt Col Jones; Maj Gen Brown; a Maj Gen decides; Flying Class II member Reports well")
+        self.assertEqual(clean, "Name: [NAME]; named [NAME]; Lt Col [NAME]; Maj Gen [NAME]; a Maj Gen decides; Flying Class II member Reports well")
+
+    def test_clinical_text_and_publication_citations_are_left_alone(self):
+        text = "History of VTE, 4N0X1, per MSD, 5 Jun 2026, C60 and Table 5-2, seen 03 Mar 2026, ICD J45.40"
+        self.assertEqual(self.red(text), (text, []))
+
+    def test_idempotent_and_listed_terms(self):
+        once, _ = self.red("SSgt Smith SSN 123-45-6789")
+        self.assertEqual(self.red(once), (once, []))
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("# bases and units\nMinot\nRamstein Air Base\n")
+        clean, found = safety_usaf.redact("seen at Minot and at ramstein air base", terms_file=f.name)
+        self.assertEqual(clean, "seen at [TERM] and at [TERM]")
+        self.assertEqual(found[0]["count"], 2)
+
+
 class ChunkingTest(unittest.TestCase):
     def test_sections_and_pages_are_kept(self):
         pages = [(1, "CHAPTER 6 MEDICAL STANDARDS\n6.1. General. text\n" + "filler\n" * 5),
