@@ -20,6 +20,7 @@
   var tabs = Array.prototype.slice.call(document.querySelectorAll(".mode-tab"));
 
   var CAT = { standards: "Medical standards", classification: "Classification", arming: "Arming and use of force", prp: "Personnel Reliability Program", waiver: "Waiver guide", narsum: "NARSUM template", other: "Other" };
+  var CURRENCY = { current: "Current", update_available: "Update available", verified: "Verified", verify_due: "Verification due", unreachable: "Status unavailable" };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = text; return e; }
   async function loadLibrary() {
     var box = document.getElementById("library-body"), sum = document.getElementById("library-summary");
@@ -29,7 +30,7 @@
       var d = await r.json(), docs = d.documents || [];
       sum.textContent = "Loaded publications (" + docs.length + ") — index built " + (d.built ? d.built.slice(0, 10) : "unknown");
       box.textContent = "";
-      box.appendChild(el("p", "library-note", "Answers use only these publications, at exactly these versions. Compare each version with e-Publishing before relying on an answer; the assistant cannot tell whether a newer one exists."));
+      box.appendChild(el("p", "library-note", "Answers use only these publications at the versions shown. Currency checks" + (d.currency_checked ? " last ran " + d.currency_checked.slice(0, 10) : " are automated") + "; verify controlling guidance in e-Publishing before use."));
       docs.forEach(function (x) {
         var row = el("div", "library-row");
         if (x.error) { row.appendChild(el("strong", "", x.short)); row.appendChild(el("div", "library-warn", "Could not be read: " + x.error)); box.appendChild(row); return; }
@@ -37,8 +38,11 @@
         row.appendChild(el("div", "", "Version: " + (x.version || x.pub_date || "unknown") + (x.date_basis && x.date_basis !== "manifest" ? " (date taken from " + x.date_basis + ", unconfirmed)" : "")));
         row.appendChild(el("div", "library-meta", (CAT[x.category] || x.category || "Other") + " · " + (x.msd_rows ? x.msd_rows + " standard lines + notes" : (x.chunks + " sections")) + " · " + x.file));
         if (x.currency && x.currency.message) {
-          var cs = x.currency.status;
-          row.appendChild(el("div", cs === "current" || cs === "verified" ? "library-meta" : "library-warn", (cs === "current" ? "Checked against e-Publishing: " : cs === "verified" ? "Verification: " : "Currency check: ") + x.currency.message));
+          var cs = CURRENCY[x.currency.status] ? x.currency.status : "unreachable";
+          var currency = el("div", "library-currency library-currency--" + cs);
+          currency.appendChild(el("span", "library-currency__status", CURRENCY[cs]));
+          currency.appendChild(el("span", "library-currency__message", x.currency.message));
+          row.appendChild(currency);
         }
         if (x.older_than_limit) row.appendChild(el("div", "library-warn", "Older than " + d.stale_days + " days: check e-Publishing for a newer version."));
         if (x.changed_since_index) row.appendChild(el("div", "library-warn", "The library settings changed after the index was built; the index needs rebuilding."));
@@ -77,6 +81,29 @@
     empty.hidden = true;
     var d = document.createElement("div"); d.className = "msg " + cls; d.textContent = text; log.appendChild(d);
     d.scrollIntoView({ behavior: "smooth", block: "end" }); return d;
+  }
+
+  function addConfirmationNote(findings) {
+    var previous = document.getElementById("cleaned-text-review");
+    if (previous) previous.remove();
+    empty.hidden = true;
+    var note = el("div", "msg msg-note");
+    note.id = "cleaned-text-review";
+    note.setAttribute("role", "status");
+    note.appendChild(el("p", "msg-note__eyebrow", "Privacy check"));
+    note.appendChild(el("h3", "msg-note__title", "Review the cleaned text before sending"));
+    note.appendChild(el("p", "msg-note__copy", "Nothing was sent to the assistant model. The cleaned version is now in the request box below. Verify every placeholder and remove any identifying detail the automated check may have missed."));
+    if (findings && findings.length) {
+      var list = el("div", "msg-note__findings");
+      list.setAttribute("aria-label", "Details replaced");
+      findings.forEach(function (finding) {
+        list.appendChild(el("span", "msg-note__finding", finding.count + " " + finding.label));
+      });
+      note.appendChild(list);
+    }
+    log.appendChild(note);
+    note.scrollIntoView({ behavior: "smooth", block: "end" });
+    return note;
   }
 
   function renderAnswer(text) {  // text with [S#] tags, rendered without innerHTML
@@ -132,8 +159,7 @@
     if (!q) return;
     if (!ack.checked) { ack.focus(); return; }
     input.value = ""; count.textContent = "0 / 6000"; submit.disabled = true;
-    var userBubble = add("msg-user", q);
-    var typing = add("typing", "Searching the publications…");
+    var typing = add("typing", "Checking for identifying details…");
     try {
       var start = await fetch("/usaf-assistant/api/ask", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -143,14 +169,23 @@
       if (!sct.includes("application/json")) { typing.remove(); add("msg-error", "Your session has probably expired. Reload this page and sign in again."); return; }
       var started = await start.json();
       if (start.status === 409 && started.needs_confirmation) {
-        // The server replaced identifiers with placeholders and sent nothing on: show the cleaned text for the person to check and send again.
-        typing.remove(); userBubble.remove();
-        input.value = started.clean_question; count.textContent = input.value.length + " / 6000";
-        add("msg-note", "Identifying details were replaced with placeholders (" + (started.findings || []).map(function (f) { return f.count + " " + f.label; }).join(", ") +
-          "). Nothing was sent. Read the text below, edit it if needed, and press Send again. This is best effort: names without a rank, units and unusual details cannot be recognised, so check it yourself.");
+        // The original request is never rendered or retained after the server returns its cleaned replacement.
+        typing.remove(); q = "";
+        input.value = typeof started.clean_question === "string" ? started.clean_question : "";
+        count.textContent = input.value.length + " / 6000";
+        input.classList.add("needs-review");
+        input.setAttribute("aria-describedby", "composer-note cleaned-text-review");
+        addConfirmationNote(started.findings || []);
+        input.focus(); input.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
       if (!start.ok || !started.job) { typing.remove(); add("msg-error", started.error || "Request failed (" + start.status + ")."); return; }
+      var confirmation = document.getElementById("cleaned-text-review");
+      if (confirmation) confirmation.remove();
+      input.classList.remove("needs-review");
+      input.setAttribute("aria-describedby", "composer-note");
+      typing.remove(); add("msg-user", q);
+      typing = add("typing", "Searching the publications…");
       // Answers take 10-40 s, longer than the 5 s the Cloudflare edge allows for one request, so poll for the result.
       var data = null, fails = 0, t0 = Date.now();
       while (Date.now() - t0 < 300000) {
