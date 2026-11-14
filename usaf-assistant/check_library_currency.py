@@ -19,6 +19,7 @@ import datetime
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -30,6 +31,7 @@ sys.path.insert(0, str(HERE))
 from runtime_paths import LIBRARY_DIR, STATE_DIR  # noqa: E402
 
 CURRENCY_FILE = STATE_DIR / "currency.json"
+STAGING_DIR = STATE_DIR / "staging"  # changed publications downloaded for review (library_update.py reads them)
 TEXTFILE = Path(os.environ.get("USAF_CURRENCY_TEXTFILE", "/var/lib/node_exporter/textfile_collector/usaf_library_currency.prom"))
 DEFAULT_VERIFY_DAYS = 90
 
@@ -95,6 +97,44 @@ def evaluate(manifest, fingerprints, local_hashes, today, previous=None):
     return out
 
 
+def stage_updates(manifest, docs, fingerprints, incoming, staging=None, now=None):
+    """Keep the downloaded file of every publication that differs from the loaded copy, and forget staged files that are no longer
+    different (the library was updated, or e-Publishing went back). Staged: STAGING/<library file>/<sha12>-<name> + meta.json.
+    Never touches the library or the index. Sets docs[f]["staged"] (or ["stage_error"]) and returns the list of staged file names."""
+    staging = Path(staging or STAGING_DIR)
+    now = now or datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    staged = []
+    for fname, d in docs.items():
+        m = manifest.get(fname) or {}
+        folder = staging / fname
+        if d.get("status") != "update_available":
+            if folder.is_dir():
+                shutil.rmtree(folder, ignore_errors=True)  # no longer different from e-Publishing
+            continue
+        fp = fingerprints.get(m.get("check_url")) or {}
+        saved = fp.get("saved")
+        if not saved or not Path(saved).is_file():
+            d["stage_error"] = "download did not return a file"
+            continue
+        if sha256_file(saved) != fp.get("sha256"):
+            d["stage_error"] = "downloaded file does not match the fingerprint"
+            continue
+        target = folder / f"{fp['sha256'][:12]}-{fname}"
+        if not target.is_file():
+            if folder.is_dir():
+                shutil.rmtree(folder, ignore_errors=True)  # an older staged version is replaced
+            folder.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(saved, target)
+        meta = {"file": fname, "short": d["short"], "url": m.get("check_url"), "sha256": fp["sha256"], "size": target.stat().st_size,
+                "remote_last_modified": fp.get("last_modified"), "fetched_at": now, "loaded_sha256": sha256_file(Path(LIBRARY_DIR) / fname) if (Path(LIBRARY_DIR) / fname).is_file() else None,
+                "staged_file": target.name}
+        write_atomic(folder / "meta.json", json.dumps(meta, indent=1) + "\n", 0o644)
+        d["staged"] = {"sha256": fp["sha256"], "size": meta["size"], "fetched_at": now, "remote_last_modified": fp.get("last_modified")}
+        d["message"] += f' A copy is staged: run ops/usaf-assistant-update.sh review "{d["short"]}".'
+        staged.append(fname)
+    return staged
+
+
 def write_atomic(path, text, mode=0o644):
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".")
@@ -120,13 +160,18 @@ def metrics_text(docs, now):
              "# HELP usaf_library_doc_status Per publication status (1 = current state)", "# TYPE usaf_library_doc_status gauge"]
     for f, d in sorted(docs.items()):
         lines.append(f'usaf_library_doc_status{{doc="{d["short"].replace(chr(34), "")}",status="{d["status"]}"}} 1')
+    lines += ["# HELP usaf_library_doc_staged 1 for a publication whose newer e-Publishing file is downloaded and waiting for review", "# TYPE usaf_library_doc_staged gauge"]
+    for f, d in sorted(docs.items()):
+        if d.get("staged"):
+            lines.append(f'usaf_library_doc_staged{{doc="{d["short"].replace(chr(34), "")}"}} 1')
     return "\n".join(lines) + "\n"
 
 
-def fetch_fingerprints(urls):
+def fetch_fingerprints(urls, save_dir=None):
+    """Fingerprint every URL in one browser session; with save_dir the bytes of each PDF are also written there (rec["saved"])."""
     if not urls:
         return {}
-    cmd = ["node", str(HERE / "fetch-epub.mjs")] + list(urls)
+    cmd = ["node", str(HERE / "fetch-epub.mjs")] + (["--save", str(save_dir)] if save_dir else []) + list(urls)
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
         data = json.loads(res.stdout)
@@ -172,13 +217,29 @@ def main():
     except (OSError, ValueError):
         previous = {}
     urls = [] if args.offline else sorted({m["check_url"] for m in manifest.values() if isinstance(m, dict) and m.get("check_url")})
-    fingerprints = fetch_fingerprints(urls)
-    local = {f: sha256_file(LIBRARY_DIR / f) for f, m in manifest.items() if isinstance(m, dict) and m.get("check_url") and (LIBRARY_DIR / f).is_file()}
-    docs = evaluate(manifest, fingerprints, local, today, previous)
-    if args.offline:  # keep the last browser-based answers for URL entries
-        for f, d in docs.items():
-            if d["mode"] == "url" and f in previous:
-                docs[f] = previous[f]
+    incoming = None
+    if urls:
+        STAGING_DIR.mkdir(parents=True, exist_ok=True)
+        os.chmod(STAGING_DIR, 0o750)
+        incoming = Path(tempfile.mkdtemp(prefix=".incoming-", dir=STAGING_DIR))
+    try:
+        fingerprints = fetch_fingerprints(urls, incoming)
+        local = {f: sha256_file(LIBRARY_DIR / f) for f, m in manifest.items() if isinstance(m, dict) and m.get("check_url") and (LIBRARY_DIR / f).is_file()}
+        docs = evaluate(manifest, fingerprints, local, today, previous)
+        if args.offline:  # keep the last browser-based answers for URL entries
+            for f, d in docs.items():
+                if d["mode"] == "url" and f in previous:
+                    docs[f] = previous[f]
+        elif urls:
+            # a failed browser run (every URL unreachable) must not discard staged files: only act on real answers
+            real = {f for f, d in docs.items() if d.get("status") in ("current", "update_available")}
+            stage_updates(manifest, {f: d for f, d in docs.items() if f in real}, fingerprints, incoming)
+            for f, d in docs.items():
+                if f not in real and (previous.get(f) or {}).get("staged"):
+                    d["staged"] = previous[f]["staged"]  # keep showing the staged copy while the check is failing
+    finally:
+        if incoming:
+            shutil.rmtree(incoming, ignore_errors=True)
     now = time.time()
     write_atomic(CURRENCY_FILE, json.dumps({"checked": datetime.datetime.fromtimestamp(now).strftime("%Y-%m-%dT%H:%M:%S"), "documents": docs}, indent=1), 0o644)
     write_atomic(TEXTFILE, metrics_text(docs, now))
