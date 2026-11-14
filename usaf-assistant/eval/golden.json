@@ -1,0 +1,4 @@
+{
+  "_about": "Optional golden questions for library_update.py. After a candidate index is built, each question whose \"doc\" is the publication being updated is run through the same hybrid retrieval the assistant uses; the update is refused unless the top 5 results include a passage of that publication whose section label contains \"section_contains\" (case-insensitive). Add entries for the passages whose answers matter most, for example {\"question\": \"...\", \"doc\": \"DAFMAN 48-123\", \"section_contains\": \"para 6.12\"}. The labels are the ones shown in the assistant's citations. Questions must not contain personal information.",
+  "questions": []
+}
