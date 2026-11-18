@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-10-30",
+  "updated": "2026-11-18",
   "clinical_owner_role": "Site owner (PA-C)",
   "status_definitions": {
     "reviewed": "Content received a documented source-based review.",
@@ -85,7 +85,9 @@
     "hprc_osgood_schlatter": {"title": "HPRC Osgood-Schlatter Disease Handout", "url": "https://www.hprc-online.org/sites/default/files/2025-03/HPRC_PF_SMF%20Handout-Osgood%20Schlatter%20Disease_508_022425.pdf", "fingerprint": true, "monitoring_strategy": "document_fingerprint"},
     "usu_rx3": {"title": "USU Rx3 Musculoskeletal Decision Support", "url": "https://rx3.usuhs.edu/", "monitoring_strategy": "official_page_monitor"},
     "aaos_hip_conditioning": {"title": "AAOS Hip Conditioning Program", "url": "https://orthoinfo.aaos.org/globalassets/pdfs/hip-conditioning-program-2026.pdf", "fingerprint": true, "monitoring_strategy": "document_fingerprint"},
-    "aaos_foot_ankle_conditioning": {"title": "AAOS Foot and Ankle Conditioning Program", "url": "https://orthoinfo.aaos.org/globalassets/pdfs/foot-and-ankle-conditioning-program---2025.pdf", "fingerprint": true, "monitoring_strategy": "document_fingerprint"}
+    "aaos_foot_ankle_conditioning": {"title": "AAOS Foot and Ankle Conditioning Program", "url": "https://orthoinfo.aaos.org/globalassets/pdfs/foot-and-ankle-conditioning-program---2025.pdf", "fingerprint": true, "monitoring_strategy": "document_fingerprint"},
+    "niddk_hemorrhoid_treatment": {"title": "NIDDK Treatment of Hemorrhoids", "url": "https://www.niddk.nih.gov/health-information/digestive-diseases/hemorrhoids/treatment", "fingerprint": true, "monitoring_strategy": "document_fingerprint"},
+    "aga_hemorrhoids_2026": {"title": "AGA Clinical Practice Update on Diagnosis and Treatment of Hemorrhoids", "url": "https://gastro.org/clinical-guidance/diagnosis-and-treatment-of-hemorrhoids/", "fingerprint": true, "monitoring_strategy": "document_fingerprint"}
   },
   "tools": [
     {"id":"abx","path":"/abx/","title":"Antibiotic Reference","risk_tier":"high","status":"reviewed","last_substantive_review":"2026-10-11","review_cadence":"monthly","monitor":"abx/check_updates.py","source_ids":["pubmed","idsa_gas_2025","cdc_gas"]},
@@ -97,7 +99,7 @@
     {"id":"clinical-assistant","path":"/clinical-assistant/","title":"Clinical Assistant","risk_tier":"contextual","status":"monitoring_only","review_cadence":"annual","monitor":null,"source_ids":[]},
     {"id":"usaf-assistant","path":"/usaf-assistant/","title":"Med Standards Assistant","risk_tier":"moderate","status":"monitoring_only","review_cadence":"quarterly","monitor":null,"source_ids":[]},
     {"id":"ddx","path":"/ddx/","title":"Differential Diagnosis Reference","risk_tier":"contextual","status":"monitoring_only","review_cadence":"annual","monitor":null,"source_ids":[]},
-    {"id":"documents","path":"/documents/","title":"Clinical Documents","risk_tier":"contextual","status":"monitoring_only","review_cadence":"annual","monitor":null,"source_ids":["hprc_achilles","hprc_cecs","hprc_groin","hprc_bsi_foot","hprc_hip_fai","hprc_gtps","hprc_posterior_tibial","hprc_return_running","hprc_carpal_tunnel","hprc_dequervains","hprc_patellar_quadriceps","hprc_sick_scapula","hprc_gird","hprc_slap","hprc_shoulder_oa","hprc_osgood_schlatter","usu_rx3","aaos_hip_conditioning","aaos_foot_ankle_conditioning"]},
+    {"id":"documents","path":"/documents/","title":"Clinical Documents","risk_tier":"contextual","status":"review_required","review_required_after":"2026-11-18","review_cadence":"annual","monitor":null,"source_ids":["hprc_achilles","hprc_cecs","hprc_groin","hprc_bsi_foot","hprc_hip_fai","hprc_gtps","hprc_posterior_tibial","hprc_return_running","hprc_carpal_tunnel","hprc_dequervains","hprc_patellar_quadriceps","hprc_sick_scapula","hprc_gird","hprc_slap","hprc_shoulder_oa","hprc_osgood_schlatter","usu_rx3","aaos_hip_conditioning","aaos_foot_ankle_conditioning","niddk_hemorrhoid_treatment","aga_hemorrhoids_2026"]},
     {"id":"drugref","path":"/drugref/","title":"FDA Label Search","risk_tier":"moderate","status":"live_source","review_cadence":"live-source","monitor":null,"source_ids":["openfda"]},
     {"id":"empiric","path":"/empiric/","title":"Empiric Therapy","risk_tier":"high","status":"monitoring_only","review_cadence":"monthly","monitor":"empiric/check_updates.py","source_ids":["pubmed","nd_antibiograms"]},
     {"id":"labs","path":"/labs/","title":"Laboratory Reference","risk_tier":"moderate","status":"monitoring_only","review_cadence":"annual","monitor":null,"source_ids":[]},

@@ -26,7 +26,7 @@
   var collections = [
     { id: 'quick', label: 'Quick access', icon: 'sparkles', title: 'Quick access', description: 'Commonly used resources, favorites, and recently opened documents.' },
     { id: 'screening', label: 'Screening & forms', icon: 'clipboard-check', title: 'Screening & assessment forms', description: 'Printable screening and assessment instruments from their original publishers.' },
-    { id: 'medication', label: 'Medication education', icon: 'pill', title: 'Medication education', description: 'Patient-facing medication counseling and quick-reference handouts.' },
+    { id: 'medication', label: 'Patient education', icon: 'notebook-tabs', title: 'Patient education', description: 'Condition-specific and medication counseling handouts for use during clinical visits.' },
     { id: 'musculoskeletal', label: 'Musculoskeletal', icon: 'bone', title: 'Musculoskeletal handouts', description: 'Exercise programs, rehabilitation protocols, and condition-specific patient handouts.' },
     { id: 'other', label: 'Vestibular', icon: 'rotate-cw', title: 'Vestibular instructions', description: 'Patient instructions for positional vertigo maneuvers.' },
     { id: 'all', label: 'All documents', icon: 'library', title: 'All documents', description: 'Browse the complete clinical document library.' }
@@ -36,6 +36,7 @@
     'GLP-1 Receptor Agonist Patient Education': 'syringe',
     'Long-Term PPI Use: Benefits & Risks': 'pill',
     'PPI Quick Guide': 'clipboard-list',
+    'Conservative Management of Hemorrhoids': 'stethoscope',
     'Shoulder — General Program': 'biceps-flexed',
     'Shoulder Impingement Syndrome': 'bone',
     'Post-Op Shoulder Rehabilitation Protocol': 'hospital',
@@ -107,7 +108,7 @@
   }
 
   function collectionForCategory(title) {
-    if (title === 'Medication Education') return 'medication';
+    if (title === 'Medication Education' || title === 'Digestive Health') return 'medication';
     if (title === 'Vestibular') return 'other';
     if (title === 'Screening & Assessment Forms') return 'screening';
     return 'musculoskeletal';

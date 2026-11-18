@@ -63,13 +63,15 @@ test.describe('Remaining-page redesign', () => {
 
     await page.goto('/documents/');
     await expect(page.getByRole('heading', { name: 'Quick access' })).toBeVisible();
-    await expect(page.locator('#doc-count')).toHaveText('50 resources available');
+    await expect(page.locator('#doc-count')).toHaveText('51 resources available');
     await expect(page.getByRole('navigation', { name: 'Document collections' }).getByRole('button')).toHaveCount(6);
-    await page.getByRole('button', { name: 'Medication education' }).click();
-    await expect(page.locator('#library-title')).toHaveText('Medication education');
+    await page.getByRole('button', { name: 'Patient education' }).click();
+    await expect(page.locator('#library-title')).toHaveText('Patient education');
     await expect(page.getByRole('link', { name: 'GLP-1 Receptor Agonist Patient Education' }).locator('.lucide-syringe')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Long-Term PPI Use: Benefits & Risks' }).locator('.lucide-pill')).toBeVisible();
     await expect(page.getByRole('link', { name: 'PPI Quick Guide' }).locator('.lucide-clipboard-list')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Conservative Management of Hemorrhoids' })).toHaveAttribute('href', 'pdfs/hemorrhoids-conservative-management.pdf');
+    await expect(page.getByRole('link', { name: 'Conservative Management of Hemorrhoids' }).locator('.lucide-stethoscope')).toBeVisible();
     await expect(page.locator('.tool-row .document-kind').first()).toHaveText('Patient education');
 
     await page.getByRole('button', { name: 'Musculoskeletal' }).click();

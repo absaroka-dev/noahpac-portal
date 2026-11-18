@@ -1,8 +1,25 @@
 {
   "schema_version": 1,
-  "updated": "2026-11-08",
+  "updated": "2026-11-18",
   "policy": "Records substantive clinical-content, safety, and governance changes. Cosmetic-only changes are omitted.",
   "entries": [
+    {
+      "id": "2026-11-18-hemorrhoid-handout",
+      "date": "2026-11-18",
+      "type": "clinical",
+      "title": "Conservative hemorrhoid-management handout",
+      "summary": "Added a concise one-page patient handout for clinician-directed conservative management of uncomplicated hemorrhoid symptoms.",
+      "clinical_change": true,
+      "scope": "Patient education on bowel habits, fiber, fluids, symptom relief, follow-up, and escalation warning signs",
+      "affected_routes": ["/documents/"],
+      "source_ids": ["niddk_hemorrhoid_treatment", "aga_hemorrhoids_2026"],
+      "changes": [
+        "Added a self-hosted, printable US Letter PDF derived from NIDDK patient guidance and the 2026 AGA clinical practice update.",
+        "Emphasized fiber, individualized fluid intake, avoidance of straining and prolonged toilet sitting, warm baths, and short-term symptom relief.",
+        "Included follow-up after one week of unsuccessful home treatment and clear prompts for bleeding, severe pain, systemic symptoms, or a tender firm lump.",
+        "Added claim-level traceability, weekly source fingerprints, and a clinician-review-required state for the new handout."
+      ]
+    },
     {
       "id": "2026-11-08-usaf-assistant",
       "date": "2026-11-08",

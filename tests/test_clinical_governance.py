@@ -32,7 +32,7 @@ class ClinicalGovernanceTests(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertIn("29 tools", completed.stdout)
-        self.assertIn("33 claim mappings", completed.stdout)
+        self.assertIn("34 claim mappings", completed.stdout)
 
     def test_all_manifest_routes_and_monitors_exist(self):
         manifest = json.loads((REPO / "clinical-review.json").read_text())
@@ -122,7 +122,7 @@ class ClinicalGovernanceTests(unittest.TestCase):
             "aaos_hip_conditioning", "aaos_foot_ankle_conditioning",
         }
         all_expected = expected | {"usu_rx3"}
-        self.assertEqual(set(documents["source_ids"]), all_expected)
+        self.assertTrue(all_expected.issubset(documents["source_ids"]))
         self.assertEqual(set(claim["source_ids"]), all_expected)
         for source_id in expected:
             source = manifest["sources"][source_id]
@@ -130,6 +130,23 @@ class ClinicalGovernanceTests(unittest.TestCase):
             self.assertEqual(source["monitoring_strategy"], "document_fingerprint")
         self.assertNotIn("fingerprint", manifest["sources"]["usu_rx3"])
         self.assertEqual(manifest["sources"]["usu_rx3"]["monitoring_strategy"], "official_page_monitor")
+
+    def test_hemorrhoid_handout_has_source_traceability(self):
+        manifest = json.loads((REPO / "clinical-review.json").read_text())
+        claims = json.loads((REPO / "clinical-claims.json").read_text())["claims"]
+        documents = next(tool for tool in manifest["tools"] if tool["id"] == "documents")
+        claim = next(claim for claim in claims if claim["id"] == "documents-hemorrhoid-handout")
+        expected = {"niddk_hemorrhoid_treatment", "aga_hemorrhoids_2026"}
+
+        self.assertTrue(expected.issubset(documents["source_ids"]))
+        self.assertEqual(set(claim["source_ids"]), expected)
+        self.assertEqual(documents["status"], "review_required")
+        for source_id in expected:
+            source = manifest["sources"][source_id]
+            self.assertIs(source.get("fingerprint"), True)
+            self.assertEqual(source["monitoring_strategy"], "document_fingerprint")
+        pdf = REPO / "documents" / "pdfs" / "hemorrhoids-conservative-management.pdf"
+        self.assertTrue(pdf.read_bytes().startswith(b"%PDF-"))
 
     def test_failure_alert_dry_run_never_prints_secrets(self):
         env = os.environ.copy()
