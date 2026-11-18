@@ -35,7 +35,7 @@ const EXTERNAL_LINKS = [
   { url: 'https://www.droracle.ai/' },
   { url: 'https://humanatlas.io/' },
   { url: 'https://www.cdc.gov/std/treatment-guidelines/' },
-  { url: 'https://www.orthoinfo.org/recovery/rotator-cuff-and-shoulder-conditioning-program/' },
+  { url: 'https://www.orthoinfo.org/globalassets/pdfs/rotator-cuff-and-shoulder-conditioning-program-2025.pdf' },
   {
     url: 'https://www.childrensmercy.org/contentassets/5cd01da6eead4dcd9e3c2333692501d8/act_adulteng.pdf',
     contentType: 'application/pdf',
