@@ -28,16 +28,20 @@ def main():
   if not user or not token:
     print('ERROR: set PUSHOVER_USER and PUSHOVER_TOKEN',file=sys.stderr); return 2
   state=pw.load_state(STATE_FILE); first_run=not state
-  state,findings=pw.run_searches(SEARCHES,state,first_run,USER_AGENT); pw.save_state(STATE_FILE,state)
+  state,findings=pw.run_searches(SEARCHES,state,first_run,USER_AGENT)
   if first_run:
-    pw.write_quarterly_result(APP_ID,APP_NAME,APP_URL,'no_change',[]); pw.save_last_checked(APP_DIR,'no_change')
+    pw.write_quarterly_result(APP_ID,APP_NAME,APP_URL,'no_change',[]); pw.save_last_checked(APP_DIR,'no_change'); pw.save_state(STATE_FILE,state)
     print('First run — monitoring state initialized.'); return 0
   if not findings:
-    pw.write_quarterly_result(APP_ID,APP_NAME,APP_URL,'no_change',[]); pw.save_last_checked(APP_DIR,'no_change')
+    pw.write_quarterly_result(APP_ID,APP_NAME,APP_URL,'no_change',[]); pw.save_last_checked(APP_DIR,'no_change'); pw.save_state(STATE_FILE,state)
     print(f'No changes detected ({date.today()}).'); return 0
-  lines=[f"{item['search_name']}: {item['title']} (PMID {item['pmid']})" for item in findings]
+  result_items=[]
+  for search_name,item in findings:
+    line=f"{search_name}: {item['title']} (PMID {item['pmid']})"
+    result_items.append({'search':search_name,'detail':line,**item})
+  lines=[item['detail'] for item in result_items]
   message='\n'.join(lines+[UPDATE_HINT]); pw.push_notify(user,token,ALERT_TITLE,message,APP_URL,APP_NAME)
-  pw.write_quarterly_result(APP_ID,APP_NAME,APP_URL,'changed',[{'detail':line} for line in lines]); pw.save_last_checked(APP_DIR,'changed')
+  pw.write_quarterly_result(APP_ID,APP_NAME,APP_URL,'changed',result_items); pw.save_last_checked(APP_DIR,'changed'); pw.save_state(STATE_FILE,state)
   print('Notification sent.'); return 0
 
 if __name__=='__main__': raise SystemExit(main())

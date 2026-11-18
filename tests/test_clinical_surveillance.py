@@ -22,6 +22,7 @@ urgent = load("urgent_clinical_monitor", "scripts/monitor-urgent-clinical-feeds.
 fingerprints = load("clinical_fingerprint_monitor", "scripts/monitor-source-fingerprints.py")
 watcher = load("pubmed_watcher_under_test", "lib/pubmed_watcher.py")
 events = load("review_events_under_test", "lib/review_events.py")
+triage = load("triage_monitor_under_test", "triage/check_updates.py")
 
 
 class UrgentFeedParsingTests(unittest.TestCase):
@@ -188,6 +189,43 @@ class PubMedSurveillanceTests(unittest.TestCase):
         serialized = watcher.report_findings(findings)
         self.assertEqual(serialized[0]["source_id"], "pubmed")
         self.assertEqual(serialized[0]["claim_id"], "calculators-screening")
+
+
+class TriageMonitorTests(unittest.TestCase):
+    def test_tuple_findings_are_reported_before_state_is_saved(self):
+        finding = {
+            "pmid": "123", "title": "Validated triage update", "journal": "Journal",
+            "pubdate": "2026", "url": "https://pubmed.ncbi.nlm.nih.gov/123/",
+        }
+        calls = []
+
+        with mock.patch.dict("os.environ", {"PUSHOVER_USER":"user", "PUSHOVER_TOKEN":"token"}), \
+             mock.patch.object(triage.pw, "load_state", return_value={"adult_triage":["old"]}), \
+             mock.patch.object(triage.pw, "run_searches", return_value=({"adult_triage":["old", "123"]}, [("Adult triage", finding)])), \
+             mock.patch.object(triage.pw, "push_notify", side_effect=lambda *_args: calls.append("notify")), \
+             mock.patch.object(triage.pw, "write_quarterly_result") as write_result, \
+             mock.patch.object(triage.pw, "save_last_checked", side_effect=lambda *_args: calls.append("status")), \
+             mock.patch.object(triage.pw, "save_state", side_effect=lambda *_args: calls.append("state")):
+            self.assertEqual(triage.main(), 0)
+
+        self.assertEqual(calls, ["notify", "status", "state"])
+        reported = write_result.call_args.args[4][0]
+        self.assertEqual(reported["search"], "Adult triage")
+        self.assertEqual(reported["pmid"], "123")
+        self.assertIn("Validated triage update", reported["detail"])
+
+    def test_notification_failure_leaves_new_state_retryable(self):
+        finding = {"pmid":"123", "title":"Update", "journal":"Journal", "pubdate":"2026"}
+
+        with mock.patch.dict("os.environ", {"PUSHOVER_USER":"user", "PUSHOVER_TOKEN":"token"}), \
+             mock.patch.object(triage.pw, "load_state", return_value={"adult_triage":["old"]}), \
+             mock.patch.object(triage.pw, "run_searches", return_value=({"adult_triage":["old", "123"]}, [("Adult triage", finding)])), \
+             mock.patch.object(triage.pw, "push_notify", side_effect=OSError("notification unavailable")), \
+             mock.patch.object(triage.pw, "save_state") as save_state:
+            with self.assertRaises(OSError):
+                triage.main()
+
+        save_state.assert_not_called()
 
 
 class FocusedReviewEventTests(unittest.TestCase):

@@ -4,6 +4,22 @@
   "policy": "Records substantive clinical-content, safety, and governance changes. Cosmetic-only changes are omitted.",
   "entries": [
     {
+      "id": "2026-11-18-triage-monitor-serialization",
+      "date": "2026-11-18",
+      "type": "governance",
+      "title": "Triage surveillance result handling",
+      "summary": "Corrected triage-monitor serialization and made PMID state persistence transactional so failed notification or reporting cannot silently consume new findings.",
+      "clinical_change": false,
+      "scope": "Automated triage literature surveillance and focused clinical-review evidence",
+      "affected_routes": ["/triage/"],
+      "source_ids": ["pubmed"],
+      "changes": [
+        "Handled the shared PubMed watcher's tuple-shaped findings correctly when constructing alerts and review evidence.",
+        "Moved triage PMID-state persistence to the end of successful processing so a failure remains retryable.",
+        "Added regression coverage for alert ordering, structured evidence, and state persistence."
+      ]
+    },
+    {
       "id": "2026-11-18-hemorrhoid-handout",
       "date": "2026-11-18",
       "type": "clinical",
