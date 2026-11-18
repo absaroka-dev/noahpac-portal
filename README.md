@@ -149,6 +149,12 @@ and `PUSHOVER_TOKEN` from the root-only environment file.
 
 `scripts/run-quarterly-monitoring.py` runs topic checks sequentially for both the monthly high-risk set and the full quarterly set, sending each consolidated report only after every selected topic has completed. Monitoring scripts send Pushover notifications when sources change. They do **not** rewrite clinical content; detected changes remain visibly pending until `scripts/acknowledge-clinical-review.py` records a source-backed human review and its protected audit entry.
 
+Consolidated email delivery enters through `scripts/send-monitoring-report.py`,
+which applies the versioned, email-client-safe layout in
+`lib/monitor_email_layout.py` before delegating transport to the installed
+reporter. The quarterly, monthly, USPSTF, and antibiogram units all use this
+same presentation layer.
+
 Systemd unit templates and secure setup instructions are in `ops/systemd/` and `docs/CLINICAL_MONITORING.md`. Secrets belong in root-only `/etc/noahpac-monitor.env`, never in root's crontab.
 
 The private review workflow, service installer, Nginx locations, and Authelia

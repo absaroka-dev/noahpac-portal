@@ -18,7 +18,7 @@ from pathlib import Path
 
 REPO = Path(os.environ.get("NOAHPAC_REPO", "/var/www/noahpac-portal")).resolve()
 REPORTER = Path(os.environ.get(
-    "NOAHPAC_REPORTER", "/opt/scripts/quarterly-email-report.py"
+    "NOAHPAC_REPORTER", str(REPO / "scripts" / "send-monitoring-report.py")
 ))
 TOPICS = [
     ("reportable", "ND Reportable Conditions"),

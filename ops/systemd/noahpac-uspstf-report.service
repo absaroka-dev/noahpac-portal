@@ -7,6 +7,6 @@ OnFailure=noahpac-monitor-failure@%n.service
 Type=oneshot
 User=root
 EnvironmentFile=/etc/noahpac-monitor.env
-ExecStart=/opt/scripts/uspstf-email-report.sh
+ExecStart=/usr/bin/python3 /var/www/noahpac-portal/scripts/send-monitoring-report.py --report-prefix uspstf-report --title "USPSTF Screener Weekly Refresh" --expected='[["uspstf","USPSTF Screener","https://noahpac.com/screener/"]]'
 StandardOutput=journal
 StandardError=journal
