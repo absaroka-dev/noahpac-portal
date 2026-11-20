@@ -81,6 +81,7 @@ async function exists(path) {
 function localPathForUrl(value) {
   const clean = value.split('#')[0].split('?')[0];
   if (!clean.startsWith('/') || clean.startsWith('//')) return null;
+  if (clean.startsWith('/authelia/')) return null; // served by Authelia through nginx, not a file in this repo
   if (clean === '/') return join(ROOT, 'index.html');
   if (clean === '/review/') return join(ROOT, 'clinical-review', 'index.html');
   if (clean === '/usaf-assistant/') return join(ROOT, 'usaf-assistant', 'web', 'index.html');
