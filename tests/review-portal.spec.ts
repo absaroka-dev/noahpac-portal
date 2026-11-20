@@ -25,6 +25,9 @@ test('review portal displays the queue and submits a source-backed acknowledgeme
   });
   await page.goto('/clinical-review/');
   await expect(page.getByText('Signed in: noah.pa')).toBeVisible();
+  const signOut = page.getByRole('link', { name: 'Sign out' });
+  await expect(signOut).toBeVisible();
+  await expect(signOut).toHaveAttribute('href', /^\/authelia\/logout\?rd=https%3A%2F%2Fwww\.noahpac\.com%2F$/);
   await expect(page.getByRole('heading', {name:'Sepsis Screening'})).toBeVisible();
   await expect(page.getByText(/1 requiring attention/)).toBeVisible();
   await page.getByRole('button', {name:'Review focused packet'}).click();
