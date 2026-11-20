@@ -388,6 +388,70 @@ class UrgentAlertFilterTests(unittest.TestCase):
         raw = b"<?xml version='1.0'?><rss><channel><item><title>T</title><link>/a</link><guid>g</guid><description>&lt;p&gt;Safe &lt;b&gt;text&lt;/b&gt;&lt;/p&gt;</description></item></channel></rss>"
         self.assertEqual(urgent.rss_entries(raw, "https://www.fda.gov/")[0]["description"], "Safe text")
 
+class FingerprintScopingTests(unittest.TestCase):
+    PAGE = (b"<html><body><nav><ul><li>Hantavirus</li><li>Avian Influenza</li></ul></nav>"
+            b"<div id='main'><p>Give penicillin V 500 mg twice daily.</p><div><p>Nested note</p></div><p>Second line</p></div>"
+            b"<footer><p>Related Content</p><p>Evidence Summary</p></footer></body></html>")
+
+    def text(self, **source):
+        return fingerprints.normalized_text(self.PAGE, "text/html", source)
+
+    def test_without_settings_the_whole_page_is_used(self):
+        self.assertIn("Avian Influenza", self.text())
+
+    def test_id_selector_keeps_the_body_and_drops_navigation_and_footer(self):
+        text = self.text(content_selector="#main")
+        self.assertIn("penicillin V 500 mg", text)
+        self.assertIn("Nested note", text)
+        self.assertIn("Second line", text)
+        self.assertNotIn("Avian Influenza", text)
+        self.assertNotIn("Related Content", text)
+
+    def test_navigation_churn_no_longer_changes_the_hash(self):
+        before = fingerprints.text_sha256(self.text(content_selector="#main"))
+        changed = self.PAGE.replace(b"Avian Influenza", b"Measles")
+        after = fingerprints.text_sha256(fingerprints.normalized_text(changed, "text/html", {"content_selector": "#main"}))
+        self.assertEqual(before, after)
+
+    def test_a_real_dose_change_still_changes_the_hash(self):
+        before = fingerprints.text_sha256(self.text(content_selector="#main"))
+        changed = self.PAGE.replace(b"500 mg", b"250 mg")
+        after = fingerprints.text_sha256(fingerprints.normalized_text(changed, "text/html", {"content_selector": "#main"}))
+        self.assertNotEqual(before, after)
+
+    def test_tag_selector_and_ignore_and_stop_patterns(self):
+        raw = b"<main><p>Keep A</p><p>Drop B</p><p>Keep C</p><p>Stop here</p><p>After</p></main><p>outside</p>"
+        text = fingerprints.normalized_text(raw, "text/html", {
+            "content_selector": "main", "ignore_line_patterns": ["^Drop"], "stop_at_line_pattern": "^Stop"})
+        self.assertEqual(text, "Keep A\nKeep C")
+
+    def test_selector_that_matches_nothing_is_an_error_not_a_silent_empty_page(self):
+        with self.assertRaises(RuntimeError):
+            self.text(content_selector="#gone")
+
+    def test_configured_selectors_extract_text_from_the_registry_sources(self):
+        manifest = json.loads((REPO / "clinical-review.json").read_text())
+        for source_id, source in manifest["sources"].items():
+            if source.get("fingerprint") and source.get("content_selector"):
+                self.assertTrue(source["content_selector"].startswith("#") or source["content_selector"].isalpha(), source_id)
+                for pattern in source.get("ignore_line_patterns", []) + ([source["stop_at_line_pattern"]] if source.get("stop_at_line_pattern") else []):
+                    __import__("re").compile(pattern)
+
+    def test_rebaseline_stores_the_new_text_without_creating_events(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "state.json"
+            state.write_text(json.dumps({"sources": {"s": {"text_sha256": "old", "sha256": "old"}}}))
+            source = {"title": "S", "url": "https://example.test/s", "content_selector": "#main"}
+            meta = {"sha256": "x", "content_type": "text/html"}
+            with mock.patch.object(fingerprints, "STATE", state), mock.patch.object(fingerprints, "SNAPSHOT_DIR", root / "snap"), \
+                 mock.patch.object(fingerprints, "fetch", return_value=(dict(meta), self.PAGE)):
+                self.assertEqual(fingerprints.rebaseline(["s"], {"s": source}), 0)
+            saved = json.loads(state.read_text())["sources"]["s"]
+            self.assertEqual(saved["text_sha256"], fingerprints.text_sha256(self.text(content_selector="#main")))
+            self.assertIn("penicillin", (root / "snap" / "s.txt").read_text())
+            self.assertEqual(fingerprints.rebaseline(["nope"], {"s": source}), 2)
+
 
 if __name__ == "__main__":
     unittest.main()
