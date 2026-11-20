@@ -8,7 +8,7 @@
   <script src="/assets/app-shell.js"></script>
   <link rel="stylesheet" href="/assets/fonts.css">
   <link rel="stylesheet" href="/shared.css">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
   <link rel="stylesheet" href="focused-review.css?v=2">
 </head>
 <body class="clinical-app review-portal-app">
@@ -22,12 +22,20 @@
         <span class="app-brand__copy"><span class="app-brand__name">Noah PA-C</span><span class="app-brand__product">Clinical Tools</span></span>
       </a>
       <div class="app-header__actions">
-        <span class="review-user" id="reviewUser" aria-live="polite"></span>
         <label class="theme-field"><span class="theme-field__label">Theme</span><select class="theme-select" data-theme-select aria-label="Color theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
-        <a class="review-signout" href="/authelia/logout?rd=https%3A%2F%2Fwww.noahpac.com%2F" aria-label="Sign out of Clinical Review Portal" title="Sign out">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
-          <span class="review-signout__label">Sign out</span>
-        </a>
+        <details class="review-account">
+          <summary class="review-account__trigger" aria-label="Account menu">
+            <svg class="review-account__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>
+            <span class="review-user" id="reviewUser" aria-live="polite"></span>
+            <svg class="review-account__chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 8 4 4 4-4"/></svg>
+          </summary>
+          <div class="review-account__menu">
+            <a class="review-account__signout" href="/authelia/logout?rd=https%3A%2F%2Fwww.noahpac.com%2F">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
+              <span>Sign out</span>
+            </a>
+          </div>
+        </details>
       </div>
     </div>
     <div class="app-header__title">
