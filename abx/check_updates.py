@@ -62,12 +62,6 @@ SEARCHES = [
     },
 
     # ── Sepsis / Critical Care ──────────────────────────────────────────────
-    {
-        'id':      'ssc',
-        'name':    'Surviving Sepsis Campaign',
-        'query':   '"Surviving Sepsis Campaign" AND (guideline OR recommendation OR update)[ti]',
-        'reldate': 400,
-    },
 
     # ── Pulmonary / Respiratory ─────────────────────────────────────────────
     {
