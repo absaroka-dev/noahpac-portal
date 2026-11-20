@@ -25,7 +25,11 @@ test('review portal displays the queue and submits a source-backed acknowledgeme
   });
   await page.goto('/clinical-review/');
   await expect(page.getByText('Signed in: noah.pa')).toBeVisible();
-  const signOut = page.getByRole('link', {name:'Sign out of Clinical Review Portal'});
+  const accountMenu = page.getByLabel('Account menu');
+  const signOut = page.getByRole('link', {name:'Sign out'});
+  await expect(accountMenu).toBeVisible();
+  await expect(signOut).toBeHidden();
+  await accountMenu.click();
   await expect(signOut).toBeVisible();
   await expect(signOut).toHaveAttribute('href','/authelia/logout?rd=https%3A%2F%2Fwww.noahpac.com%2F');
   await expect(page.getByRole('heading', {name:'Sepsis Screening'})).toBeVisible();
@@ -55,7 +59,13 @@ test('review portal fits a phone and retains dark mode', async ({ page }) => {
   await page.goto('/clinical-review/');
   await page.getByLabel('Color theme').selectOption('dark');
   await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
-  const signOut = page.getByRole('link', {name:'Sign out of Clinical Review Portal'});
+  const accountMenu = page.getByLabel('Account menu');
+  await expect(accountMenu).toBeVisible();
+  const accountBox = await accountMenu.boundingBox();
+  expect(accountBox?.width).toBeGreaterThanOrEqual(44);
+  expect(accountBox?.height).toBeGreaterThanOrEqual(44);
+  await accountMenu.click();
+  const signOut = page.getByRole('link', {name:'Sign out'});
   await expect(signOut).toBeVisible();
   const signOutBox = await signOut.boundingBox();
   expect(signOutBox?.width).toBeGreaterThanOrEqual(44);
