@@ -36,7 +36,7 @@ SEARCHES = [
     {
         'id':      'toxic_alcohol_poisoning',
         'name':    'Toxic Alcohol Poisoning (Methanol / Ethylene Glycol)',
-        'query':   '(methanol[ti] OR "ethylene glycol"[ti] OR fomepizole[ti]) AND (poisoning[tiab] OR toxicity[tiab] OR management[tiab]) AND (guideline OR "practice guideline" OR consensus OR review)[pt]',
+        'query':   '(methanol[ti] OR "ethylene glycol"[ti] OR fomepizole[ti] OR "toxic alcohol"[ti]) AND (poisoning[ti] OR overdose[ti] OR antidote[ti] OR intoxication[ti]) AND (guideline[pt] OR "practice guideline"[pt] OR consensus[ti] OR review[pt]) NOT (catalysis[tiab] OR hydrogenation[tiab] OR fuel[tiab] OR electrocatalytic[tiab] OR oxidation reaction[tiab] OR PET[tiab])',
         'reldate': 400,
     },
     {

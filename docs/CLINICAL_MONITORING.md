@@ -45,6 +45,39 @@ detected change also creates a durable, claim-scoped packet under
 stored under `source-snapshots/`. Fetch failures return a non-zero status and
 trigger the systemd failure notifier; they are never reported as "no change."
 
+## Keeping the review queue relevant (2026-11-20)
+
+The review queue exists for items that could change deployed content, so each
+layer filters before it queues:
+
+- **Urgent FDA feed.** `urgent-clinical-feeds.json` has a `filters` block on the
+  FDA channel. An alert is *dropped* when its link path or title marks it as a
+  device, food, animal, cosmetic or undeclared-ingredient item; *logged* when it
+  is a lot-level drug recall (`/safety/recalls-market-withdrawals-safety-alerts/`);
+  *screened* when it names no drug, class or vaccine any tool covers; and
+  *routed* only when its title or description contains a `watch_terms` entry,
+  and then only to the tools that list that term (not to all ten). Every
+  non-routed item is appended to `/var/lib/noahpac-monitor/urgent-screened.jsonl`
+  (time, title, url, decision, reason), so nothing is lost and a wrong decision
+  can be found and corrected. The CDC HAN channel has no filters and still queues
+  everything. Edit `watch_terms` when a tool starts covering a new drug. Rules are
+  in `lib/alert_filter.py`; `tests/test_clinical_surveillance.py` replays the
+  cases that mattered (for example "Glucagon-Like Peptide-1" must not match the
+  glucagon antidote).
+- **Document fingerprints.** A source may set `content_selector` (`main`,
+  `article` or `#element-id`) so only that part of the page is hashed,
+  `ignore_line_patterns` (regexes for lines to drop) and `stop_at_line_pattern`
+  (ignore everything from the first matching line on). Landing pages hashed whole
+  were re-flagged every week by menu and news-feed changes. A selector that
+  matches nothing is reported as an extraction error, never as "no change".
+  After changing how a source is hashed, run
+  `sudo python3 scripts/monitor-source-fingerprints.py --rebaseline <source_id>...`
+  once, or the next weekly run reports a change that is only the new method.
+- **PubMed topic monitors.** Prefer title-field and publication-type restrictions
+  over free-text ANDs; before replacing a query, test the old and new one against
+  PubMed and confirm every item a reviewer judged relevant is still retrieved
+  (a tighter query that returns 0 results is a failed monitor, not a quiet one).
+
 ## Schedules
 
 - Urgent FDA/CDC surveillance: daily at 04:05.

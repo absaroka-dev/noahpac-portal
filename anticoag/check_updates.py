@@ -42,7 +42,7 @@ SEARCHES = [
     {
         'id':      'periprocedural_bridging',
         'name':    'Periprocedural Anticoagulation Bridging',
-        'query':   '(anticoagul*[ti] OR DOAC[ti] OR warfarin[ti]) AND (periprocedural[tiab] OR perioperative[tiab] OR bridging[tiab]) AND (guideline OR "practice guideline" OR consensus)[pt]',
+        'query':   '(anticoagul*[ti] OR DOAC[ti] OR warfarin[ti] OR antithrombotic[ti]) AND (periprocedural[ti] OR perioperative[ti] OR bridging[ti]) AND (guideline[pt] OR "practice guideline"[pt] OR consensus[ti])',
         'reldate': 400,
     },
     {

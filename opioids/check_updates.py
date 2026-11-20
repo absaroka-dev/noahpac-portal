@@ -41,7 +41,7 @@ SEARCHES = [
     {
         'id':      'mme_conversion',
         'name':    'Opioid MME Conversion Factors',
-        'query':   '("morphine milligram equivalent" OR "MME" OR "equianalgesic") AND (opioid OR analgesic) AND (conversion OR factor OR ratio) AND (guideline OR recommendation OR update)[ti]',
+        'query':   '(("morphine milligram equivalent"[ti] OR MME[ti] OR equianalgesic[ti] OR "opioid conversion"[ti] OR "dose conversion"[ti]) AND (conversion[tiab] OR factor[tiab] OR ratio[tiab] OR equianalgesic[tiab])) AND (guideline[pt] OR recommendation[tiab] OR update[tiab] OR CDC[tiab])',
         'reldate': 400,
     },
     {
