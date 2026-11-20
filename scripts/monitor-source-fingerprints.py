@@ -46,29 +46,54 @@ def atomic_json(path: Path, payload: dict) -> None:
 
 
 class TextExtractor(HTMLParser):
-    def __init__(self):
+    """Collects visible text. With a selector ("main", "article" or "#some-id") only that element counts."""
+
+    VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"}
+
+    def __init__(self, selector: str | None = None):
         super().__init__()
         self.parts = []
         self.hidden = 0
+        self.selector = (selector or "").strip()
+        self.capture_tag = None
+        self.capture_depth = 0
+        self.matched = not self.selector
+
+    def _selects(self, tag, attrs) -> bool:
+        if self.selector.startswith("#"):
+            return dict(attrs).get("id") == self.selector[1:]
+        return tag == self.selector
+
+    @property
+    def active(self) -> bool:
+        return not self.selector or self.capture_depth > 0
 
     def handle_starttag(self, tag, attrs):
+        if self.selector and tag not in self.VOID:
+            if self.capture_depth == 0 and self._selects(tag, attrs):
+                self.capture_tag, self.capture_depth, self.matched = tag, 1, True
+            elif self.capture_depth > 0 and tag == self.capture_tag:
+                self.capture_depth += 1
         if tag in {"script", "style", "noscript", "svg"}:
             self.hidden += 1
-        elif not self.hidden and tag in {"p", "li", "h1", "h2", "h3", "h4", "tr", "br"}:
+        elif self.active and not self.hidden and tag in {"p", "li", "h1", "h2", "h3", "h4", "tr", "br"}:
             self.parts.append("\n")
 
     def handle_endtag(self, tag):
         if tag in {"script", "style", "noscript", "svg"} and self.hidden:
             self.hidden -= 1
-        elif not self.hidden and tag in {"p", "li", "h1", "h2", "h3", "h4", "tr"}:
+        elif self.active and not self.hidden and tag in {"p", "li", "h1", "h2", "h3", "h4", "tr"}:
             self.parts.append("\n")
+        if self.selector and self.capture_depth > 0 and tag == self.capture_tag:
+            self.capture_depth -= 1
 
     def handle_data(self, data):
-        if not self.hidden:
+        if self.active and not self.hidden:
             self.parts.append(data)
 
 
-def normalized_text(raw: bytes, content_type: str) -> str:
+def normalized_text(raw: bytes, content_type: str, source: dict | None = None) -> str:
+    source = source or {}
     if content_type == "application/pdf" or raw.startswith(b"%PDF"):
         completed = subprocess.run(
             ["/usr/bin/pdftotext", "-layout", "-", "-"], input=raw,
@@ -78,13 +103,21 @@ def normalized_text(raw: bytes, content_type: str) -> str:
             raise RuntimeError(completed.stderr.decode("utf-8", "replace")[:500])
         text = completed.stdout.decode("utf-8", "replace")
     else:
-        parser = TextExtractor()
-        parser.feed(raw.decode("utf-8", "replace"))
+        html = raw.decode("utf-8", "replace")
+        selector = source.get("content_selector")
+        parser = TextExtractor(selector)
+        parser.feed(html)
         text = "".join(parser.parts)
+        if selector and (not parser.matched or not text.strip()):
+            raise RuntimeError(f"content_selector {selector!r} matched no text; the page layout may have changed")
+    ignore = [re.compile(pattern) for pattern in source.get("ignore_line_patterns", [])]
+    stop = re.compile(source["stop_at_line_pattern"]) if source.get("stop_at_line_pattern") else None
     lines = []
     for line in text.splitlines():
         clean = re.sub(r"\s+", " ", line).strip()
-        if clean:
+        if stop and clean and stop.search(clean):
+            break
+        if clean and not any(pattern.search(clean) for pattern in ignore):
             lines.append(clean)
     return "\n".join(lines)
 
@@ -176,9 +209,40 @@ def heartbeat() -> None:
     pubmed_watcher.write_heartbeat("source_fingerprints")
 
 
+def rebaseline(source_ids: list[str], watched: dict) -> int:
+    unknown = [source_id for source_id in source_ids if source_id not in watched]
+    if unknown:
+        print(f"Not fingerprinted sources: {', '.join(unknown)}", file=sys.stderr)
+        return 2
+    if not STATE.exists():
+        print("No fingerprint state yet; nothing to rebaseline.", file=sys.stderr)
+        return 2
+    state = json.loads(STATE.read_text())
+    now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+    failures = 0
+    for source_id in source_ids:
+        source = watched[source_id]
+        try:
+            fingerprint, raw = fetch(source)
+            text = normalized_text(raw, fingerprint["content_type"], source)
+            fingerprint["text_sha256"] = text_sha256(text)
+            state.setdefault("sources", {})[source_id] = fingerprint | {"checked_at": now, "title": source["title"], "url": source["url"]}
+            atomic_text(SNAPSHOT_DIR / f"{source_id}.txt", text)
+            print(f"rebaselined {source_id}: {len(text.splitlines())} lines")
+        except Exception as exc:  # noqa: BLE001
+            failures += 1
+            print(f"FAILED {source_id}: {exc}", file=sys.stderr)
+    state["updated_at"] = now
+    atomic_json(STATE, state)
+    return 1 if failures else 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--rebaseline", nargs="+", metavar="SOURCE_ID",
+                        help="re-fetch these sources and store their current text as the new baseline, "
+                             "without creating review events or notifications (use after changing how a source is hashed)")
     args = parser.parse_args()
     manifest = json.loads(MANIFEST.read_text())
     claims = json.loads(CLAIMS.read_text())
@@ -194,6 +258,9 @@ def main() -> int:
         print(f"Clinical document fingerprint configuration valid: {len(watched)} documents.")
         return 0
 
+    if args.rebaseline:
+        return rebaseline(args.rebaseline, watched)
+
     previous = json.loads(STATE.read_text()) if STATE.exists() else {"sources": {}}
     first_run = not STATE.exists()
     now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
@@ -208,7 +275,7 @@ def main() -> int:
             previous_text = snapshot_path.read_text(encoding="utf-8") if snapshot_path.exists() else ""
             extraction_error = None
             try:
-                current_text = normalized_text(raw, fingerprint["content_type"])
+                current_text = normalized_text(raw, fingerprint["content_type"], source)
             except Exception as exc:  # noqa: BLE001
                 current_text = ""
                 extraction_error = str(exc)[:500]

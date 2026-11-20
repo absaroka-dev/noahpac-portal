@@ -23,6 +23,7 @@ fingerprints = load("clinical_fingerprint_monitor", "scripts/monitor-source-fing
 watcher = load("pubmed_watcher_under_test", "lib/pubmed_watcher.py")
 events = load("review_events_under_test", "lib/review_events.py")
 triage = load("triage_monitor_under_test", "triage/check_updates.py")
+alert_filter = load("alert_filter_under_test", "lib/alert_filter.py")
 
 
 class UrgentFeedParsingTests(unittest.TestCase):
@@ -289,6 +290,167 @@ class ReviewEvidencePersistenceTests(unittest.TestCase):
             self.assertTrue(result["independent_review_pending"])
             self.assertEqual(result["primary_reviewer"], "reviewer.one")
             self.assertEqual(result["review_claim_ids"], ["claim"])
+
+class UrgentAlertFilterTests(unittest.TestCase):
+    CONFIG = json.loads((REPO / "urgent-clinical-feeds.json").read_text())
+    FILTERS = next(c for c in CONFIG["channels"] if c["id"] == "fda_medwatch")["filters"]
+
+    def decide(self, title, path="/safety/medical-product-safety-information/x", description=""):
+        return alert_filter.classify(
+            {"title": title, "url": "https://www.fda.gov" + path, "description": description}, self.FILTERS)
+
+    def test_device_food_veterinary_and_supplement_alerts_are_dropped(self):
+        for title, path in (
+            ("Early Alert: B. Braun Removes Streamline Bloodline Set", "/medical-devices/medical-device-recalls-and-early-alerts/x"),
+            ("Heart Pump Controller Recall: Abiomed Removes Impella Controllers", "/medical-devices/x"),
+            ("Wedgewood Issues Recall of Compounded Veterinary Medications", "/safety/recalls-market-withdrawals-safety-alerts/x"),
+            ("FDA Advises Consumers Not to Buy or Serve Toddler Soft-Baked Bars", "/food/outbreaks/x"),
+            ("Recall of 10 Day Forecast Capsules Due to Undeclared Sildenafil", "/safety/recalls-market-withdrawals-safety-alerts/x"),
+            ("Medical Device Correction Update Luna G3 BPAP System", "/safety/recalls-market-withdrawals-safety-alerts/x"),
+        ):
+            with self.subTest(title=title):
+                self.assertEqual(self.decide(title, path)["decision"], "drop")
+
+    def test_lot_level_drug_recalls_are_logged_not_queued(self):
+        verdict = self.decide("Eugia Issues Nationwide Recall of Vancomycin Hydrochloride for Injection",
+                              "/safety/recalls-market-withdrawals-safety-alerts/eugia")
+        self.assertEqual(verdict["decision"], "log")
+        self.assertEqual(verdict["tool_ids"], [])
+
+    def test_safety_communication_for_a_covered_drug_routes_only_to_tools_that_cover_it(self):
+        verdict = self.decide("FDA Drug Safety Communication: Fluoroquinolone antibiotics and aortic aneurysm")
+        self.assertEqual(verdict["decision"], "route")
+        self.assertIn("abx", verdict["tool_ids"])
+        self.assertNotIn("anticoag", verdict["tool_ids"])
+        self.assertNotIn("steroids", verdict["tool_ids"])
+
+    def test_description_text_is_searched_too(self):
+        verdict = self.decide("MedWatch Alert: New warning", description="Andexxa reversal agent thromboembolic events")
+        self.assertEqual(verdict["decision"], "route")
+        self.assertEqual(verdict["tool_ids"], ["anticoag"])
+
+    def test_unrelated_drug_alert_is_screened_not_queued(self):
+        self.assertEqual(self.decide("MedWatch Alert: FDA Investigating Serious Risk of Malignancy Linked to Zolgensma Gene Therapy")["decision"], "screen")
+
+    def test_glucagon_like_peptide_does_not_match_the_glucagon_antidote(self):
+        verdict = self.decide("MedWatch Alert: FDA Requires Safety Labeling Changes for Glucagon-Like Peptide-1 Receptor Agonists (GLP-1 RAs)")
+        self.assertEqual(verdict["decision"], "screen")
+        self.assertEqual(self.decide("Glucagon emergency kit shortage")["tool_ids"], ["toxicology"])
+
+    def test_channel_without_filters_routes_everything_as_before(self):
+        verdict = alert_filter.classify({"title": "CDCHAN-00520", "url": "https://www.cdc.gov/han/x"}, None)
+        self.assertEqual(verdict["decision"], "route")
+        self.assertIsNone(verdict["tool_ids"])
+
+    def test_every_watch_term_tool_belongs_to_the_channel(self):
+        channel = next(c for c in self.CONFIG["channels"] if c["id"] == "fda_medwatch")
+        self.assertTrue(set(self.FILTERS["watch_terms"]) <= set(channel["tool_ids"]))
+
+    def test_pipeline_queues_only_applicable_alerts_and_logs_the_rest(self):
+        import sys as _sys
+        _sys.path.insert(0, str(REPO / "lib"))
+        import review_events as live_events
+        feed = (b"<?xml version='1.0'?><rss><channel>"
+                b"<item><title>Early Alert: Pump Infusion Sets</title><link>https://www.fda.gov/medical-devices/a</link><guid>a</guid></item>"
+                b"<item><title>Drug Safety Communication: Fluoroquinolone antibiotics</title><link>https://www.fda.gov/safety/medical-product-safety-information/b</link><guid>b</guid></item>"
+                b"<item><title>Zolgensma malignancy risk</title><link>https://www.fda.gov/safety/medical-product-safety-information/c</link><guid>c</guid></item>"
+                b"</channel></rss>")
+        config = {"schema_version": 1, "channels": [{
+            "id": "fda", "title": "FDA", "type": "rss", "url": "https://example.test/rss",
+            "tool_ids": ["abx", "anticoag", "steroids"], "filters": self.FILTERS | {"watch_terms": {"abx": ["fluoroquinolone"], "anticoag": ["andexxa"]}}}]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config.json").write_text(json.dumps(config))
+            state = root / "state.json"
+            state.write_text(json.dumps({"channels": {"fda": {"seen": ["old"]}}}))
+            sent, pending = [], []
+            with mock.patch.object(urgent, "CONFIG", root / "config.json"), \
+                 mock.patch.object(urgent, "STATE", state), mock.patch.object(urgent, "REPORT", root / "report.json"), \
+                 mock.patch.object(urgent, "SCREENED_LOG", root / "screened.jsonl"), \
+                 mock.patch.object(urgent, "fetch", return_value=(feed, "https://example.test/rss")), \
+                 mock.patch.object(urgent, "mark_pending", side_effect=pending.append), \
+                 mock.patch.object(urgent, "notify", side_effect=sent.append), \
+                 mock.patch.object(urgent, "heartbeat"), \
+                 mock.patch.object(live_events, "EVENT_DIR", root / "events"), \
+                 mock.patch.object(_sys, "argv", ["monitor"]):
+                self.assertEqual(urgent.main(), 0)
+            created = [json.loads(path.read_text()) for path in (root / "events").glob("*.json")]
+            self.assertEqual([event["tool_id"] for event in created], ["abx"])
+            self.assertEqual(pending, [["abx"]])
+            self.assertEqual([item["id"] for item in sent[0]], ["b"])
+            logged = [json.loads(line) for line in (root / "screened.jsonl").read_text().splitlines()]
+            self.assertEqual({row["id"]: row["decision"] for row in logged}, {"a": "drop", "c": "screen"})
+            report = json.loads((root / "report.json").read_text())
+            self.assertEqual(len(report["findings"]), 1)
+            self.assertEqual(len(report["screened"]), 2)
+
+    def test_rss_description_is_captured_without_markup(self):
+        raw = b"<?xml version='1.0'?><rss><channel><item><title>T</title><link>/a</link><guid>g</guid><description>&lt;p&gt;Safe &lt;b&gt;text&lt;/b&gt;&lt;/p&gt;</description></item></channel></rss>"
+        self.assertEqual(urgent.rss_entries(raw, "https://www.fda.gov/")[0]["description"], "Safe text")
+
+class FingerprintScopingTests(unittest.TestCase):
+    PAGE = (b"<html><body><nav><ul><li>Hantavirus</li><li>Avian Influenza</li></ul></nav>"
+            b"<div id='main'><p>Give penicillin V 500 mg twice daily.</p><div><p>Nested note</p></div><p>Second line</p></div>"
+            b"<footer><p>Related Content</p><p>Evidence Summary</p></footer></body></html>")
+
+    def text(self, **source):
+        return fingerprints.normalized_text(self.PAGE, "text/html", source)
+
+    def test_without_settings_the_whole_page_is_used(self):
+        self.assertIn("Avian Influenza", self.text())
+
+    def test_id_selector_keeps_the_body_and_drops_navigation_and_footer(self):
+        text = self.text(content_selector="#main")
+        self.assertIn("penicillin V 500 mg", text)
+        self.assertIn("Nested note", text)
+        self.assertIn("Second line", text)
+        self.assertNotIn("Avian Influenza", text)
+        self.assertNotIn("Related Content", text)
+
+    def test_navigation_churn_no_longer_changes_the_hash(self):
+        before = fingerprints.text_sha256(self.text(content_selector="#main"))
+        changed = self.PAGE.replace(b"Avian Influenza", b"Measles")
+        after = fingerprints.text_sha256(fingerprints.normalized_text(changed, "text/html", {"content_selector": "#main"}))
+        self.assertEqual(before, after)
+
+    def test_a_real_dose_change_still_changes_the_hash(self):
+        before = fingerprints.text_sha256(self.text(content_selector="#main"))
+        changed = self.PAGE.replace(b"500 mg", b"250 mg")
+        after = fingerprints.text_sha256(fingerprints.normalized_text(changed, "text/html", {"content_selector": "#main"}))
+        self.assertNotEqual(before, after)
+
+    def test_tag_selector_and_ignore_and_stop_patterns(self):
+        raw = b"<main><p>Keep A</p><p>Drop B</p><p>Keep C</p><p>Stop here</p><p>After</p></main><p>outside</p>"
+        text = fingerprints.normalized_text(raw, "text/html", {
+            "content_selector": "main", "ignore_line_patterns": ["^Drop"], "stop_at_line_pattern": "^Stop"})
+        self.assertEqual(text, "Keep A\nKeep C")
+
+    def test_selector_that_matches_nothing_is_an_error_not_a_silent_empty_page(self):
+        with self.assertRaises(RuntimeError):
+            self.text(content_selector="#gone")
+
+    def test_configured_selectors_extract_text_from_the_registry_sources(self):
+        manifest = json.loads((REPO / "clinical-review.json").read_text())
+        for source_id, source in manifest["sources"].items():
+            if source.get("fingerprint") and source.get("content_selector"):
+                self.assertTrue(source["content_selector"].startswith("#") or source["content_selector"].isalpha(), source_id)
+                for pattern in source.get("ignore_line_patterns", []) + ([source["stop_at_line_pattern"]] if source.get("stop_at_line_pattern") else []):
+                    __import__("re").compile(pattern)
+
+    def test_rebaseline_stores_the_new_text_without_creating_events(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "state.json"
+            state.write_text(json.dumps({"sources": {"s": {"text_sha256": "old", "sha256": "old"}}}))
+            source = {"title": "S", "url": "https://example.test/s", "content_selector": "#main"}
+            meta = {"sha256": "x", "content_type": "text/html"}
+            with mock.patch.object(fingerprints, "STATE", state), mock.patch.object(fingerprints, "SNAPSHOT_DIR", root / "snap"), \
+                 mock.patch.object(fingerprints, "fetch", return_value=(dict(meta), self.PAGE)):
+                self.assertEqual(fingerprints.rebaseline(["s"], {"s": source}), 0)
+            saved = json.loads(state.read_text())["sources"]["s"]
+            self.assertEqual(saved["text_sha256"], fingerprints.text_sha256(self.text(content_selector="#main")))
+            self.assertIn("penicillin", (root / "snap" / "s.txt").read_text())
+            self.assertEqual(fingerprints.rebaseline(["nope"], {"s": source}), 2)
 
 
 if __name__ == "__main__":

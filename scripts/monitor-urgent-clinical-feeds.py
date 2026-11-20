@@ -21,10 +21,14 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+import alert_filter  # noqa: E402
+
 REPO = Path(os.environ.get("NOAHPAC_REPO", "/var/www/noahpac-portal")).resolve()
 CONFIG = REPO / "urgent-clinical-feeds.json"
 STATE = Path(os.environ.get("NOAHPAC_URGENT_STATE", "/var/lib/noahpac-monitor/urgent-feeds-state.json"))
 REPORT = Path(os.environ.get("NOAHPAC_URGENT_REPORT", "/var/lib/noahpac-monitor/urgent-feeds-latest.json"))
+SCREENED_LOG = Path(os.environ.get("NOAHPAC_URGENT_SCREENED", "/var/lib/noahpac-monitor/urgent-screened.jsonl"))
 USER_AGENT = "NoahPAC-Urgent-Clinical-Monitor/1.0"
 
 
@@ -47,9 +51,13 @@ def rss_entries(raw: bytes, base_url: str) -> list[dict]:
             return (node.text or node.attrib.get("href") or "").strip()
         title = value("title")
         link = value("link")
+        description = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", value("description") or value("summary"))).strip()[:1500]
         guid = value("guid") or value("id") or link or title
         if guid:
-            entries.append({"id": guid, "title": title or "Untitled alert", "url": urllib.parse.urljoin(base_url, link)})
+            entry = {"id": guid, "title": title or "Untitled alert", "url": urllib.parse.urljoin(base_url, link)}
+            if description:
+                entry["description"] = description
+            entries.append(entry)
     return entries
 
 
@@ -85,6 +93,22 @@ def atomic_json(path: Path, payload: dict) -> None:
     except Exception:
         Path(temporary).unlink(missing_ok=True)
         raise
+
+
+def log_screened(items: list[dict], when: str) -> None:
+    if not items:
+        return
+    SCREENED_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with SCREENED_LOG.open("a", encoding="utf-8") as handle:
+        for item in items:
+            handle.write(json.dumps({
+                "screened_at": when, "channel": item["channel"], "id": item["id"], "title": item["title"],
+                "url": item["url"], "decision": item["decision"], "reason": item["reason"],
+            }, sort_keys=True) + "\n")
+    try:
+        os.chmod(SCREENED_LOG, 0o640)
+    except OSError:
+        pass
 
 
 def mark_pending(tool_ids: list[str]) -> None:
@@ -126,6 +150,15 @@ def validate(config: dict) -> list[str]:
             errors.append(f"channel {channel.get('id')} requires HTTPS")
         if not channel.get("tool_ids"):
             errors.append(f"channel {channel.get('id')} has no affected tools")
+        filters = channel.get("filters") or {}
+        for pattern in filters.get("drop_title_patterns", []):
+            try:
+                re.compile(pattern)
+            except re.error as exc:
+                errors.append(f"channel {channel.get('id')} bad drop_title_patterns entry {pattern!r}: {exc}")
+        for tool_id in filters.get("watch_terms", {}):
+            if tool_id not in channel.get("tool_ids", []):
+                errors.append(f"channel {channel.get('id')} watch_terms names {tool_id}, which is not one of its tools")
     return errors
 
 
@@ -145,7 +178,7 @@ def main() -> int:
     previous = json.loads(STATE.read_text()) if STATE.exists() else {"channels": {}}
     first_run = not STATE.exists()
     next_state = {"updated_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"), "channels": {}}
-    findings, failures = [], []
+    findings, failures, screened = [], [], []
     for channel in config["channels"]:
         try:
             raw, final_url = fetch(channel["url"])
@@ -153,7 +186,19 @@ def main() -> int:
             known = set(previous.get("channels", {}).get(channel["id"], {}).get("seen", []))
             unseen = [] if first_run else [entry for entry in entries if entry["id"] not in known]
             for entry in unseen:
-                findings.append(entry | {"channel": channel["title"], "tool_ids": channel["tool_ids"]})
+                verdict = alert_filter.classify(entry, channel.get("filters"))
+                if verdict["decision"] == "route":
+                    routed_tools = verdict["tool_ids"] if verdict["tool_ids"] is not None else channel["tool_ids"]
+                    routed_tools = [tool for tool in routed_tools if tool in channel["tool_ids"]]
+                    if not routed_tools:
+                        screened.append(entry | {"channel": channel["title"], "decision": "screen", "reason": "matched tools are outside this channel's scope"})
+                        continue
+                    finding = entry | {"channel": channel["title"], "tool_ids": routed_tools}
+                    if verdict["matched_terms"]:
+                        finding["matched_terms"] = verdict["matched_terms"]
+                    findings.append(finding)
+                else:
+                    screened.append(entry | {"channel": channel["title"], "decision": verdict["decision"], "reason": verdict["reason"]})
             next_state["channels"][channel["id"]] = {
                 "seen": sorted(known | {entry["id"] for entry in entries})[-1000:],
                 "entry_count": len(entries), "last_success": next_state["updated_at"],
@@ -165,6 +210,7 @@ def main() -> int:
                 next_state["channels"][channel["id"]] = previous["channels"][channel["id"]]
 
     atomic_json(STATE, next_state)
+    log_screened(screened, next_state["updated_at"])
     affected = sorted({tool for finding in findings for tool in finding["tool_ids"]})
     if affected:
         mark_pending(affected)
@@ -178,8 +224,8 @@ def main() -> int:
                     detected_at=next_state["updated_at"],
                 )
     notify(findings)
-    atomic_json(REPORT, {"checked_at": next_state["updated_at"], "first_run": first_run, "findings": findings, "failures": failures})
-    print(f"Urgent clinical surveillance: {len(findings)} new alert(s), {len(failures)} failure(s).")
+    atomic_json(REPORT, {"checked_at": next_state["updated_at"], "first_run": first_run, "findings": findings, "screened": [{k: item[k] for k in ("channel", "title", "decision", "reason")} for item in screened], "failures": failures})
+    print(f"Urgent clinical surveillance: {len(findings)} new alert(s), {len(screened)} screened out, {len(failures)} failure(s).")
     if not failures:
         heartbeat()
     return 1 if failures else 0

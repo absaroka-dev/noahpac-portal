@@ -36,7 +36,7 @@ SEARCHES = [
     {
         'id':      'hpa_axis_suppression',
         'name':    'HPA Axis Suppression / Adrenal Insufficiency Risk',
-        'query':   '("HPA axis" OR "hypothalamic-pituitary-adrenal" OR "adrenal insufficiency" OR "adrenal suppression") AND (glucocorticoid OR corticosteroid) AND (exogenous OR iatrogenic) AND (guideline OR "practice guideline" OR review)[pt]',
+        'query':   '("iatrogenic adrenal insufficiency"[tiab] OR "glucocorticoid-induced adrenal"[tiab] OR "adrenal suppression"[tiab] OR "HPA axis suppression"[tiab]) AND (glucocorticoid OR corticosteroid) AND (guideline[pt] OR "practice guideline"[pt] OR consensus[ti]) NOT (animal*[ti] OR veterinary[ti] OR mice[tiab] OR murine[tiab] OR rat[tiab])',
         'reldate': 400,
     },
     {
@@ -48,7 +48,7 @@ SEARCHES = [
     {
         'id':      'endocrine_society_glucocorticoid',
         'name':    'Endocrine Society Glucocorticoid / Adrenal Guidance',
-        'query':   '("Endocrine Society") AND (glucocorticoid OR adrenal OR corticosteroid OR "adrenal insufficiency") AND (guideline OR "clinical practice guideline")',
+        'query':   '"Endocrine Society" AND (glucocorticoid OR corticosteroid OR "adrenal insufficiency" OR "adrenal suppression") AND (guideline[pt] OR "clinical practice guideline"[ti])',
         'reldate': 400,
     },
     {
