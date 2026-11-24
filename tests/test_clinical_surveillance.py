@@ -85,6 +85,68 @@ class FingerprintMappingTests(unittest.TestCase):
                 fingerprints.open_source(url)
         self.assertEqual(urlopen.call_count, 1)
 
+    def _fetch_with_opens(self, opens):
+        """Run fetch() with open_source scripted to raise or return each item in turn; sleeps are recorded, not waited."""
+        class Response(io.BytesIO):
+            headers = type("H", (), {"get": lambda self, key: None, "get_content_type": lambda self: "text/html"})()
+            def geturl(self):
+                return "https://example.org/doc"
+        calls = []
+
+        def fake_open(url):
+            calls.append(url)
+            item = opens[len(calls) - 1]
+            if isinstance(item, BaseException):
+                raise item
+            return Response(item)
+
+        sleeps = []
+        source = {"title": "Example document", "url": "https://example.org/doc"}
+        with mock.patch.object(fingerprints, "open_source", side_effect=fake_open), \
+                mock.patch.object(fingerprints.time, "sleep", side_effect=sleeps.append):
+            try:
+                result = fingerprints.fetch(source)
+                error = None
+            except Exception as exc:  # noqa: BLE001
+                result, error = None, exc
+        return result, error, calls, sleeps
+
+    def test_dns_blip_is_retried_then_succeeds(self):
+        # The 2026-11-24 failure: the resolver answered "Name or service not known" once for a name that resolves fine.
+        dns = urllib.error.URLError(OSError(-2, "Name or service not known"))
+        result, error, calls, sleeps = self._fetch_with_opens([dns, b"<p>Dose 5 mg</p>"])
+        self.assertIsNone(error)
+        self.assertEqual(result[1], b"<p>Dose 5 mg</p>")
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(sleeps, [5.0])
+
+    def test_server_error_is_retried_with_growing_delay(self):
+        busy = urllib.error.HTTPError("https://example.org/doc", 503, "Unavailable", {}, io.BytesIO(b""))
+        result, error, calls, sleeps = self._fetch_with_opens([busy, busy, b"ok"])
+        self.assertIsNone(error)
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(sleeps, [5.0, 20.0])
+
+    def test_removed_page_is_not_retried(self):
+        gone = urllib.error.HTTPError("https://example.org/doc", 404, "Not Found", {}, io.BytesIO(b""))
+        _, error, calls, sleeps = self._fetch_with_opens([gone])
+        self.assertIsInstance(error, urllib.error.HTTPError)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(sleeps, [])
+
+    def test_sustained_outage_still_fails_after_bounded_attempts(self):
+        dns = urllib.error.URLError(OSError(-2, "Name or service not known"))
+        _, error, calls, sleeps = self._fetch_with_opens([dns, dns, dns, b"never reached"])
+        self.assertIsInstance(error, urllib.error.URLError)
+        self.assertEqual(len(calls), fingerprints.FETCH_MAX_ATTEMPTS)
+        self.assertEqual(len(sleeps), fingerprints.FETCH_MAX_ATTEMPTS - 1)
+
+    def test_oversized_document_is_not_retried(self):
+        big = io.BytesIO(b"x" * (50 * 1024 * 1024 + 1))
+        _, error, calls, _ = self._fetch_with_opens([big.getvalue()])
+        self.assertIsInstance(error, ValueError)
+        self.assertEqual(len(calls), 1)
+
     def test_maps_changed_source_to_all_affected_tools(self):
         claims = {"claims":[
             {"tool_id":"a","source_ids":["source"]},

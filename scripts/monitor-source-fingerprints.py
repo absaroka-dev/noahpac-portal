@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import http.client
 from html.parser import HTMLParser
 import json
 import os
@@ -13,6 +14,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -29,6 +31,12 @@ REPORT = Path(os.environ.get("NOAHPAC_FINGERPRINT_REPORT", "/var/lib/noahpac-mon
 SNAPSHOT_DIR = Path(os.environ.get("NOAHPAC_FINGERPRINT_SNAPSHOTS", "/var/lib/noahpac-monitor/source-snapshots"))
 USER_AGENT = "NoahPAC-Clinical-Document-Monitor/1.0"
 ACCEPT = "application/pdf, text/html;q=0.8"
+# A source that cannot be reached for a moment (a DNS lookup that answers "not found", a reset connection, a 503) must not
+# fail the whole weekly run: the next scheduled check is a week away. Retries are bounded and the last error still raises,
+# so a sustained outage or a removed page is reported exactly as before.
+FETCH_MAX_ATTEMPTS = 3
+FETCH_BACKOFF_SECONDS = 5.0  # waits 5 s, then 20 s
+FETCH_RETRYABLE_HTTP_STATUS = {429, 500, 502, 503, 504}
 
 
 def atomic_json(path: Path, payload: dict) -> None:
@@ -163,7 +171,7 @@ def open_source(monitored_url: str):
         return urllib.request.urlopen(retry, timeout=60)
 
 
-def fetch(source: dict) -> tuple[dict, bytes]:
+def fetch_once(source: dict) -> tuple[dict, bytes]:
     monitored_url = source.get("fingerprint_url", source["url"])
     with open_source(monitored_url) as response:
         raw = response.read(50 * 1024 * 1024 + 1)
@@ -178,6 +186,31 @@ def fetch(source: dict) -> tuple[dict, bytes]:
             "monitored_url": monitored_url,
             "final_url": response.geturl(),
         }, raw)
+
+
+def is_transient_fetch_error(exc: BaseException) -> bool:
+    """True for failures worth another attempt; a 404/403/410, a bad certificate or an oversized file is not."""
+    if isinstance(exc, urllib.error.HTTPError):  # before URLError: HTTPError is a subclass of it
+        return exc.code in FETCH_RETRYABLE_HTTP_STATUS
+    return isinstance(exc, (urllib.error.URLError, TimeoutError, ConnectionError, http.client.IncompleteRead))
+
+
+def fetch(source: dict) -> tuple[dict, bytes]:
+    for attempt in range(1, FETCH_MAX_ATTEMPTS + 1):
+        try:
+            return fetch_once(source)
+        except Exception as exc:  # noqa: BLE001
+            if attempt == FETCH_MAX_ATTEMPTS or not is_transient_fetch_error(exc):
+                raise
+            delay = FETCH_BACKOFF_SECONDS * 4 ** (attempt - 1)
+            reason = getattr(exc, "reason", exc)
+            print(
+                f"{source['title']}: transient fetch error ({reason}); retrying in {delay:.0f}s "
+                f"(attempt {attempt + 1}/{FETCH_MAX_ATTEMPTS})",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+    raise RuntimeError("unreachable fetch retry state")
 
 
 def affected_tools(source_id: str, claims: dict) -> list[str]:
